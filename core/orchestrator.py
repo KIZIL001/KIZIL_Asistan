@@ -105,21 +105,20 @@ class Orchestrator:
             return
         try:
             t = self.task_mgr.add_task(desc)
-            print(f"KIZIL: Görev eklendi: [{t['id']}] {t['description']}")
-            self.memory.add_to_context("user", girdi)
-            self.memory.add_to_context("assistant", f"Görev eklendi: {t['description']}")
-            self.memory.save_conversation(girdi, f"Görev eklendi: {t['description']}")
+            print(f"KIZIL: Görev eklendi: [{t['id']}] {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev ekleme hatası: {e}")
             print(f"KIZIL: Görev eklenemedi: {e}")
 
     def _task_list(self):
         try:
-            lst = self.task_mgr.list_tasks()
-            print("KIZIL:\n" + lst)
-            self.memory.add_to_context("user", "görevler")
-            self.memory.add_to_context("assistant", lst)
-            self.memory.save_conversation("görevler", lst)
+            tasks = self.task_mgr.list_tasks()
+            if not tasks:
+                print("KIZIL: Henüz görev yok.")
+                return
+            for t in tasks:
+                durum = "✓" if t.get("done") else "☐"
+                print(f"  {durum} [{t['id']}] {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev listeleme hatası: {e}")
             print(f"KIZIL: Görevler listelenemedi: {e}")
@@ -127,26 +126,20 @@ class Orchestrator:
     def _task_del(self, girdi):
         try:
             gid = girdi.split()[-1]
-            r = self.task_mgr.delete_task(gid)
-            print("KIZIL:", r)
-            self.memory.add_to_context("user", girdi)
-            self.memory.add_to_context("assistant", r)
-            self.memory.save_conversation(girdi, r)
+            ok = self.task_mgr.delete_task(gid)
+            print(f"KIZIL: Görev #{gid} silindi." if ok else f"KIZIL: Görev #{gid} bulunamadı.")
         except Exception as e:
             self.logger.error(f"Görev silme hatası: {e}")
-            print("KIZIL: Görev silinirken hata oluştu. Lütfen geçerli bir numara girdiğinden emin ol.")
+            print("KIZIL: Görev silinirken hata oluştu.")
 
     def _task_done(self, girdi):
         try:
             gid = girdi.split()[-1]
-            r = self.task_mgr.mark_done(gid)
-            print("KIZIL:", r)
-            self.memory.add_to_context("user", girdi)
-            self.memory.add_to_context("assistant", r)
-            self.memory.save_conversation(girdi, r)
+            ok = self.task_mgr.mark_done(gid)
+            print(f"KIZIL: Görev #{gid} tamamlandı." if ok else f"KIZIL: Görev #{gid} bulunamadı.")
         except Exception as e:
             self.logger.error(f"Görev tamamlama hatası: {e}")
-            print("KIZIL: Görev tamamlanırken hata oluştu. Lütfen geçerli bir numara girdiğinden emin ol.")
+            print("KIZIL: Görev tamamlanırken hata oluştu.")
 
     def stop(self):
         self.running = False
