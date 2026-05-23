@@ -2,6 +2,7 @@ from modules.chat.chat_module import ChatModule
 from core.llm_router import LLMRouter
 from modules.tasks.task_manager import TaskManager
 from core.memory_manager import MemoryManager
+from modules.session.session_manager import SessionManager
 from utils.logger import Logger
 from utils.config import Config
 
@@ -9,15 +10,24 @@ from utils.config import Config
 class Orchestrator:
     def __init__(self, debug_mode=False):
         self.config = Config()
-        self.logger = Logger(log_dir=self.config.STORAGE_DIR, log_file=self.config.LOG_FILE)
+        self.logger = Logger(
+            log_dir=self.config.STORAGE_DIR,
+            log_file=self.config.LOG_FILE,
+            log_level=self.config.LOG_LEVEL,
+            debug_mode=debug_mode,
+        )
         self.router = LLMRouter(model=self.config.LLM_MODEL)
         self.chat = ChatModule(router=self.router)
         self.memory = MemoryManager()
         self.task_mgr = TaskManager(storage_dir=self.config.STORAGE_DIR)
+        self.session = SessionManager(storage_dir=self.config.STORAGE_DIR)
         self.running = False
+
+    # ---------- ana döngü ----------
 
     def start(self):
         self.running = True
+        self.session.start_session()
         self.logger.info("KIZIL Asistan başlatılıyor...")
         print("KIZIL Asistan başlatıldı.")
         print("Komutlar için 'yardım' yazabilirsin.\n")
@@ -41,7 +51,9 @@ class Orchestrator:
             elif komut == "özetle":
                 self._summary()
             elif komut.startswith("hatırla "):
-                self._remember(girdi)
+                user_msg, resp = self._remember(girdi)
+                if resp is not None:
+                    self._save(user_msg, resp)
             elif komut.startswith("görev ekle "):
                 self._task_add(girdi)
             elif komut in ("görevler", "görev listesi"):
@@ -51,10 +63,19 @@ class Orchestrator:
             elif komut.startswith("görev tamam "):
                 self._task_done(girdi)
             else:
-                self._chat(girdi)
+                user_msg, resp = self._chat(girdi)
+                if resp is not None:
+                    self._save(user_msg, resp)
         except Exception as e:
             self.logger.error(f"İşlem hatası: {e}")
             print("KIZIL: Bir hata oluştu. Lütfen tekrar dene.")
+
+    def _save(self, user_msg, resp):
+        self.memory.save_conversation(user_msg, resp)
+        self.memory.add_to_context("user", user_msg)
+        self.memory.add_to_context("assistant", resp)
+
+    # ---------- yardım ----------
 
     def _help(self):
         print("""
@@ -71,44 +92,62 @@ görev sil <no>                → görevi sil
 görev tamam <no>              → görevi tamamlandı işaretle
         """.strip())
 
-    def _chat(self, msg):
+    # ---------- LLM sarmalayıcı ----------
+
+    def _safe_llm(self, func, *args):
         try:
+            return func(*args)
+        except ConnectionError:
+            print("KIZIL: LLM bağlantısı kurulamadı. Ollama çalışıyor mu?")
+            return None
+        except Exception as e:
+            self.logger.error(f"LLM hatası: {e}")
+            print("KIZIL: LLM çağrısı sırasında hata oluştu.")
+            return None
+
+    # ---------- sohbet ----------
+
+    def _chat(self, msg):
+        def istek():
             ctx = self.memory.get_context()
             resp = self.chat.yanit_ver(msg, ctx)
             print("KIZIL:", resp)
-            self.memory.add_to_context("user", msg)
-            self.memory.add_to_context("assistant", resp)
-            self.memory.save_conversation(msg, resp)
-        except ConnectionError:
-            print("KIZIL: LLM bağlantısı kurulamadı. Ollama çalışıyor mu?")
-        except Exception as e:
-            self.logger.error(f"Sohbet hatası: {e}")
-            print("KIZIL: Sohbet sırasında hata oluştu.")
+            return resp
+
+        resp = self._safe_llm(istek)
+        return msg, resp
+
+    # ---------- özet ----------
 
     def _summary(self):
-        try:
+        def istek():
             f, s = self.memory.summarize_and_save(self.router.model, self.chat)
             if f:
                 print(f"KIZIL: Özet kaydedildi: {f}")
                 print("Özet:", s)
             else:
                 print("KIZIL:", s)
-        except Exception as e:
-            self.logger.error(f"Özetleme hatası: {e}")
-            print("KIZIL: Özetleme sırasında hata oluştu.")
+            return s
+
+        self._safe_llm(istek)
+
+    # ---------- hafıza ----------
 
     def _remember(self, girdi):
         q = girdi[8:].strip()
         if not q:
             print("KIZIL: Ne hakkında hatırlatma yapmamı istersin?")
-            return
-        try:
+            return girdi, None
+
+        def istek():
             a = self.memory.search_memory(q, self.chat)
             print("KIZIL:", a)
-            self.memory.save_conversation(girdi, a)
-        except Exception as e:
-            self.logger.error(f"Hafıza hatası: {e}")
-            print("KIZIL: Hafıza sorgulanırken hata oluştu.")
+            return a
+
+        resp = self._safe_llm(istek)
+        return girdi, resp
+
+    # ---------- görevler ----------
 
     def _task_add(self, girdi):
         desc = girdi[11:].strip()
@@ -153,7 +192,10 @@ görev tamam <no>              → görevi tamamlandı işaretle
             self.logger.error(f"Görev tamamlama hatası: {e}")
             print("KIZIL: Görev tamamlanırken hata oluştu.")
 
+    # ---------- kapanış ----------
+
     def stop(self):
+        self.session.end_session()
         self.running = False
         self.logger.info("KIZIL Asistan kapatılıyor.")
         print("Görüşmek üzere!")
