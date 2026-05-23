@@ -5,13 +5,12 @@ from core.memory_manager import MemoryManager
 from utils.logger import Logger
 from utils.config import Config
 
-class Orchestrator:
-    """Tüm modülleri yönetir ve kullanıcı etkileşimini sağlar (hata yönetimi güçlendirildi)."""
 
+class Orchestrator:
     def __init__(self):
         self.config = Config()
         self.logger = Logger(log_dir=self.config.STORAGE_DIR, log_file=self.config.LOG_FILE)
-        self.router = LLMRouter(model=self.config.LLM_MODEL)
+        self.router = LLMRouter(model=self.router.model)
         self.chat = ChatModule(router=self.router)
         self.memory = MemoryManager()
         self.task_mgr = TaskManager(storage_dir=self.config.STORAGE_DIR)
@@ -20,10 +19,8 @@ class Orchestrator:
     def start(self):
         self.running = True
         self.logger.info("KIZIL Asistan başlatılıyor...")
-        self.logger.info("Modüller yüklendi.")
         print("KIZIL Asistan başlatıldı.")
-        print("Sohbet et, çık/exit ile çık.")
-        print("Komutlar: özetle, hatırla <soru>, görev ekle <açıklama>, görevler, görev sil <no>, görev tamam <no>")
+        print("Komutlar için 'yardım' yazabilirsin.\n")
         while self.running:
             try:
                 girdi = input("Sen: ").strip()
@@ -35,27 +32,44 @@ class Orchestrator:
             self._process(girdi)
 
     def _process(self, girdi):
-        """Gelen komutu ayır ve ilgili işleme yönlendir."""
         try:
-            if girdi.lower() in ("çık", "exit", "quit", "q"):
+            komut = girdi.lower()
+            if komut in ("çık", "exit", "quit", "q"):
                 self.stop()
-            elif girdi.lower() == "özetle":
+            elif komut in ("yardım", "yardim", "help", "h"):
+                self._help()
+            elif komut == "özetle":
                 self._summary()
-            elif girdi.lower().startswith("hatırla"):
+            elif komut.startswith("hatırla "):
                 self._remember(girdi)
-            elif girdi.lower().startswith("görev ekle"):
+            elif komut.startswith("görev ekle "):
                 self._task_add(girdi)
-            elif girdi.lower() in ("görevler", "görev listesi"):
+            elif komut in ("görevler", "görev listesi"):
                 self._task_list()
-            elif girdi.lower().startswith("görev sil"):
+            elif komut.startswith("görev sil "):
                 self._task_del(girdi)
-            elif girdi.lower().startswith("görev tamam"):
+            elif komut.startswith("görev tamam "):
                 self._task_done(girdi)
             else:
                 self._chat(girdi)
         except Exception as e:
-            self.logger.error(f"Komut işlenirken hata: {e}")
-            print(f"KIZIL: Üzgünüm, bir hata oluştu. Lütfen tekrar dener misin? (Hata: {e})")
+            self.logger.error(f"İşlem hatası: {e}")
+            print("KIZIL: Bir hata oluştu. Lütfen tekrar dene.")
+
+    def _help(self):
+        print("""
+KIZIL Asistan - Komut Listesi
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+sohbet için direkt yaz        → merhaba, nasılsın
+çık, exit, quit, q            → asistanı kapat
+yardım, help, h               → bu listeyi göster
+özetle                        → konuşma özeti çıkar
+hatırla <soru>                → hafızadan sorgula
+görev ekle <açıklama>         → yeni görev ekle
+görevler                      → görevleri listele
+görev sil <no>                → görevi sil
+görev tamam <no>              → görevi tamamlandı işaretle
+        """.strip())
 
     def _chat(self, msg):
         try:
@@ -66,37 +80,35 @@ class Orchestrator:
             self.memory.add_to_context("assistant", resp)
             self.memory.save_conversation(msg, resp)
         except ConnectionError:
-            print("KIZIL: LLM bağlantısı şu anda kurulamıyor. Lütfen Ollama'nın çalıştığından emin ol.")
+            print("KIZIL: LLM bağlantısı kurulamadı. Ollama çalışıyor mu?")
         except Exception as e:
             self.logger.error(f"Sohbet hatası: {e}")
-            print(f"KIZIL: Sohbet sırasında beklenmeyen bir hata oluştu: {e}")
+            print("KIZIL: Sohbet sırasında hata oluştu.")
 
     def _summary(self):
         try:
-            f, s = self.memory.summarize_and_save(self.config.LLM_MODEL, self.chat)
+            f, s = self.memory.summarize_and_save(self.router.model, self.chat)
             if f:
-                print("KIZIL: Özet kaydedildi:", f)
+                print(f"KIZIL: Özet kaydedildi: {f}")
                 print("Özet:", s)
             else:
                 print("KIZIL:", s)
         except Exception as e:
             self.logger.error(f"Özetleme hatası: {e}")
-            print(f"KIZIL: Özetleme sırasında hata oluştu: {e}")
+            print("KIZIL: Özetleme sırasında hata oluştu.")
 
     def _remember(self, girdi):
-        q = girdi[7:].strip()
+        q = girdi[8:].strip()
         if not q:
             print("KIZIL: Ne hakkında hatırlatma yapmamı istersin?")
             return
         try:
             a = self.memory.search_memory(q, self.chat)
             print("KIZIL:", a)
-            self.memory.add_to_context("user", girdi)
-            self.memory.add_to_context("assistant", a)
             self.memory.save_conversation(girdi, a)
         except Exception as e:
-            self.logger.error(f"Hafıza sorgulama hatası: {e}")
-            print(f"KIZIL: Hafıza sorgulanırken hata oluştu: {e}")
+            self.logger.error(f"Hafıza hatası: {e}")
+            print("KIZIL: Hafıza sorgulanırken hata oluştu.")
 
     def _task_add(self, girdi):
         desc = girdi[11:].strip()
@@ -108,7 +120,7 @@ class Orchestrator:
             print(f"KIZIL: Görev eklendi: [{t['id']}] {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev ekleme hatası: {e}")
-            print(f"KIZIL: Görev eklenemedi: {e}")
+            print("KIZIL: Görev eklenemedi.")
 
     def _task_list(self):
         try:
@@ -121,11 +133,11 @@ class Orchestrator:
                 print(f"  {durum} [{t['id']}] {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev listeleme hatası: {e}")
-            print(f"KIZIL: Görevler listelenemedi: {e}")
+            print("KIZIL: Görevler listelenemedi.")
 
     def _task_del(self, girdi):
         try:
-            gid = girdi.split()[-1]
+            gid = girdi[10:].strip()
             ok = self.task_mgr.delete_task(gid)
             print(f"KIZIL: Görev #{gid} silindi." if ok else f"KIZIL: Görev #{gid} bulunamadı.")
         except Exception as e:
@@ -134,7 +146,7 @@ class Orchestrator:
 
     def _task_done(self, girdi):
         try:
-            gid = girdi.split()[-1]
+            gid = girdi[12:].strip()
             ok = self.task_mgr.mark_done(gid)
             print(f"KIZIL: Görev #{gid} tamamlandı." if ok else f"KIZIL: Görev #{gid} bulunamadı.")
         except Exception as e:
