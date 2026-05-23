@@ -1,1 +1,0 @@
-print("KIZIL Asistan çalışıyor!")
