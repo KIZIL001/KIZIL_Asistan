@@ -15,7 +15,8 @@ def main():
     logger.info(f"Depolama dizini: {config.STORAGE_DIR}")
 
     print("KIZIL Asistan başlatıldı.")
-    print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.\n")
+    print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.")
+    print("Geçmiş konuşmaları özetlemek için 'özetle' yaz.\n")
 
     try:
         while True:
@@ -29,18 +30,24 @@ def main():
                 logger.info("Kullanıcı çıkış komutu girdi.")
                 break
 
-            # Hafızadan şu ana kadarki konuşma geçmişini al
-            context = memory.get_context()
+            # Özel komut: özetle
+            if girdi.lower() == "özetle":
+                logger.info("Özetleme başlatıldı.")
+                dosya, sonuc = memory.summarize_and_save(config.LLM_MODEL, chat)
+                if dosya:
+                    print(f"KIZIL: Konuşmalar özetlendi ve kaydedildi: {dosya}")
+                    print(f"Özet: {sonuc}")
+                else:
+                    print(f"KIZIL: Özetleme başarısız. {sonuc}")
+                continue  # döngü başa dönsün
 
-            # Cevabı üret
+            # Normal sohbet
+            context = memory.get_context()
             cevap = chat.yanit_ver(girdi, context)
             print(f"KIZIL: {cevap}")
 
-            # Yeni mesajları hafızaya ekle (önce kullanıcı, sonra asistan)
             memory.add_to_context("user", girdi)
             memory.add_to_context("assistant", cevap)
-
-            # Dosyaya kaydet
             memory.save_conversation(girdi, cevap)
             logger.debug(f"Konuşma kaydedildi: {girdi} -> {cevap}")
 
