@@ -1,15 +1,20 @@
 from modules.chat.chat_module import ChatModule
 from core.memory_manager import MemoryManager
 from utils.logger import Logger
+from utils.config import Config
 
 def main():
-    logger = Logger()
+    config = Config()
+    logger = Logger(log_dir=config.STORAGE_DIR, log_file=config.LOG_FILE)
     logger.info("KIZIL Asistan başlatılıyor...")
 
     chat = ChatModule()
-    memory = MemoryManager()
+    memory = MemoryManager(storage_path=config.STORAGE_DIR)
 
     logger.info("Modüller yüklendi.")
+    logger.info(f"Depolama dizini: {config.STORAGE_DIR}")
+    logger.debug(f"Log dosyası: {config.LOG_FILE}")
+
     print("KIZIL Asistan başlatıldı.")
     print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.\n")
 
