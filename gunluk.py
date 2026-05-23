@@ -12,16 +12,14 @@ def bugunun_dosyasi():
 def yaz():
     dosya = bugunun_dosyasi()
     print(f"Bugünün günlüğü: {dosya}")
-    print("Ne yazmak istersin? (Bitirince ENTER, sonra Ctrl+D)")
-    satirlar = []
-    try:
-        while True:
-            satir = input()
-            satirlar.append(satir)
-    except EOFError:
-        pass
+    print("Ne yazmak istersin? (ENTER ile satır satır yaz, boş ENTER ile bitir)")
     with open(dosya, "a", encoding="utf-8") as f:
-        f.write("\n".join(satirlar) + "\n")
+        while True:
+            satir = input("> ")
+            if satir == "":
+                break
+            saat = datetime.now().strftime("%H:%M")
+            f.write(f"[{saat}] {satir}\n")
     print("Kaydedildi.")
 
 def oku():
