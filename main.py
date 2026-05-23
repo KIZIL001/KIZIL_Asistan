@@ -1,28 +1,42 @@
 from modules.chat.chat_module import ChatModule
 from core.memory_manager import MemoryManager
+from utils.logger import Logger
 
 def main():
+    logger = Logger()
+    logger.info("KIZIL Asistan başlatılıyor...")
+
     chat = ChatModule()
     memory = MemoryManager()
 
+    logger.info("Modüller yüklendi.")
     print("KIZIL Asistan başlatıldı.")
     print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.\n")
 
-    while True:
-        try:
-            girdi = input("Sen: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nKapatılıyor...")
-            break
+    try:
+        while True:
+            try:
+                girdi = input("Sen: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                logger.info("Kullanıcı çıkış sinyali gönderdi.")
+                break
 
-        if girdi.lower() in ("çık", "exit", "quit", "q"):
-            print("Görüşmek üzere!")
-            break
+            if girdi.lower() in ("çık", "exit", "quit", "q"):
+                logger.info("Kullanıcı çıkış komutu girdi.")
+                break
 
-        cevap = chat.yanit_ver(girdi)
-        print(f"KIZIL: {cevap}")
+            cevap = chat.yanit_ver(girdi)
+            print(f"KIZIL: {cevap}")
 
-        memory.save_conversation(girdi, cevap)
+            memory.save_conversation(girdi, cevap)
+            logger.debug(f"Konuşma kaydedildi: {girdi} -> {cevap}")
+
+    except Exception as e:
+        logger.error(f"Beklenmeyen hata: {e}")
+
+    finally:
+        logger.info("KIZIL Asistan kapatılıyor.")
+        print("Görüşmek üzere!")
 
 if __name__ == "__main__":
     main()
