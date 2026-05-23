@@ -1,20 +1,10 @@
-import os
-from datetime import datetime
 from modules.chat.chat_module import ChatModule
-
-KONUSMALAR_DIZINI = os.path.join("storage", "conversations")
-KONUSMA_DOSYASI = os.path.join(KONUSMALAR_DIZINI, "gunluk.txt")
-
-def konusmayi_kaydet(girdi, cevap):
-    os.makedirs(KONUSMALAR_DIZINI, exist_ok=True)
-    with open(KONUSMA_DOSYASI, "a", encoding="utf-8") as f:
-        zaman = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        f.write(f"{zaman} | Kullanici: {girdi}\n")
-        f.write(f"{zaman} | KIZIL: {cevap}\n")
-        f.write("-" * 30 + "\n")
+from core.memory_manager import MemoryManager
 
 def main():
     chat = ChatModule()
+    memory = MemoryManager()
+
     print("KIZIL Asistan başlatıldı.")
     print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.\n")
 
@@ -32,7 +22,7 @@ def main():
         cevap = chat.yanit_ver(girdi)
         print(f"KIZIL: {cevap}")
 
-        konusmayi_kaydet(girdi, cevap)
+        memory.save_conversation(girdi, cevap)
 
 if __name__ == "__main__":
     main()
