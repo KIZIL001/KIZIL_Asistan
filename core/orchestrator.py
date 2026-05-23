@@ -98,11 +98,14 @@ görev tamam <no>              → görevi tamamlandı işaretle
         try:
             return func(*args)
         except ConnectionError:
-            print("KIZIL: LLM bağlantısı kurulamadı. Ollama çalışıyor mu?")
+            print("KIZIL: LLM baglantisi kurulamadi.")
+            print("  -> Ollama calisiyor mu? (http://localhost:11434)")
+            print("  -> Model yuklu mu? 'ollama list' ile kontrol et.")
             return None
         except Exception as e:
-            self.logger.error(f"LLM hatası: {e}")
-            print("KIZIL: LLM çağrısı sırasında hata oluştu.")
+            self.logger.error(f"LLM hatasi: {e}")
+            print(f"KIZIL: LLM cagrisi sirasinda hata olustu.")
+            print(f"  -> Hata: {e}")
             return None
 
     # ---------- sohbet ----------

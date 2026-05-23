@@ -1,6 +1,7 @@
 import json
 import os
 
+
 class Config:
     _instance = None
     _data = {}
@@ -35,6 +36,10 @@ class Config:
         if name in self._data:
             return self._data[name]
         raise AttributeError(f"Config'de '{name}' bulunamadı")
+
+    def set(self, key: str, value):
+        self._data[key] = value
+        self.save()
 
     def save(self):
         config_file = os.path.join("storage", "config.json")

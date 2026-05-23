@@ -8,8 +8,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     app = Orchestrator(debug_mode=args.debug)
+
     if args.model:
         app.router.model = args.model
+        app.config.set("LLM_MODEL", args.model)
 
     if args.debug:
         app.logger.info(f"Debug modu aktif. Model: {app.router.model}")
