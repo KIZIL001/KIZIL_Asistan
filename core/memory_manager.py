@@ -31,7 +31,6 @@ class MemoryManager:
             f.write("-" * 30 + "\n")
 
     def _read_last_lines(self, max_lines=50):
-        """Günlük dosyasının son N satırını okur."""
         if not os.path.exists(self.conversation_file):
             return ""
         with open(self.conversation_file, "r", encoding="utf-8") as f:
@@ -39,17 +38,11 @@ class MemoryManager:
         return "".join(lines[-max_lines:])
 
     def summarize_and_save(self, model_name, chat_module):
-        """
-        Son konuşmaları okur, özetini LLM'den alır ve memory dizinine kaydeder.
-        chat_module: ChatModule örneği (yanıt_ver metodu ile çağırmak yerine doğrudan LLM kullanacak)
-        model_name: kullanılacak model adı
-        """
         config = Config()
         recent_text = self._read_last_lines(max_lines=config.SUMMARY_MAX_LINES)
         if not recent_text.strip():
             return None, "Henüz kayıtlı konuşma yok."
 
-        # Özetleme için LLM'e sor
         prompt = f"Aşağıdaki konuşma kaydından önemli noktaları, alınan kararları ve kullanıcı hakkında edinilen bilgileri kısa bir özet halinde çıkar. Sadece özeti yaz, başka bir şey yazma:\n\n{recent_text}"
         try:
             summary = chat_module._llm_yanit(prompt)
@@ -59,7 +52,6 @@ class MemoryManager:
         if not summary:
             return None, "Özet alınamadı."
 
-        # Özeti dosyaya kaydet
         tarih = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         ozet_dosyasi = os.path.join(self.memory_dir, f"ozet_{tarih}.txt")
         with open(ozet_dosyasi, "w", encoding="utf-8") as f:
@@ -69,3 +61,31 @@ class MemoryManager:
             f.write(summary)
 
         return ozet_dosyasi, summary
+
+    def _load_all_summaries(self):
+        """Tüm özet dosyalarını okur ve birleştirir."""
+        if not os.path.exists(self.memory_dir):
+            return ""
+        tum_ozetler = []
+        for dosya in sorted(os.listdir(self.memory_dir)):
+            if dosya.endswith(".txt"):
+                with open(os.path.join(self.memory_dir, dosya), "r", encoding="utf-8") as f:
+                    tum_ozetler.append(f.read())
+        return "\n\n---\n\n".join(tum_ozetler)
+
+    def search_memory(self, soru, chat_module):
+        """
+        Kaydedilmiş özetleri kullanarak kullanıcının sorusuna yanıt arar.
+        chat_module: ChatModule örneği (LLM sorgusu için)
+        """
+        tum_metin = self._load_all_summaries()
+        if not tum_metin.strip():
+            return "Henüz hiçbir özet kaydedilmemiş. Önce 'özetle' komutunu kullanmalısın."
+
+        # LLM'e bağlam olarak özetleri ver, soruyu cevaplat
+        prompt = f"Aşağıda geçmiş konuşmalara ait özetler bulunuyor. Bu özetlere dayanarak kullanıcının sorusuna kısa ve net bir cevap ver.\n\n--- ÖZETLER ---\n{tum_metin}\n\n--- SORU ---\n{soru}\n\nCevap:"
+        try:
+            cevap = chat_module._llm_yanit(prompt)
+            return cevap if cevap else "Hafızamda bir şey bulamadım."
+        except Exception as e:
+            return f"Hafıza sorgulama hatası: {e}"

@@ -16,7 +16,8 @@ def main():
 
     print("KIZIL Asistan başlatıldı.")
     print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.")
-    print("Geçmiş konuşmaları özetlemek için 'özetle' yaz.\n")
+    print("Geçmiş konuşmaları özetlemek için 'özetle' yaz.")
+    print("Hafızayı sorgulamak için 'hatırla <sorun>' yaz.\n")
 
     try:
         while True:
@@ -39,7 +40,22 @@ def main():
                     print(f"Özet: {sonuc}")
                 else:
                     print(f"KIZIL: Özetleme başarısız. {sonuc}")
-                continue  # döngü başa dönsün
+                continue
+
+            # Özel komut: hafıza sorgulama
+            if girdi.lower().startswith("hatırla"):
+                soru = girdi[7:].strip()  # "hatırla " kısmını at
+                if not soru:
+                    print("KIZIL: Ne hakkında hatırlatma yapmamı istersin? Örnek: 'hatırla benimle ilgili neler biliyorsun'")
+                    continue
+                logger.info(f"Hafıza sorgusu: {soru}")
+                cevap = memory.search_memory(soru, chat)
+                print(f"KIZIL: {cevap}")
+                # Bu soruyu da kısa süreli hafızaya ekle
+                memory.add_to_context("user", girdi)
+                memory.add_to_context("assistant", cevap)
+                memory.save_conversation(girdi, cevap)
+                continue
 
             # Normal sohbet
             context = memory.get_context()
