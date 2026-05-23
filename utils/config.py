@@ -8,5 +8,8 @@ class Config:
     # Log seviyesi (DEBUG, INFO, WARNING, ERROR)
     LOG_LEVEL = "DEBUG"
 
-    # Varsayılan yanıtlar (şimdilik)
+    # LLM ayarları
+    LLM_MODEL = "phi3:mini"   # Ollama ile kullanılacak model
+
+    # Varsayılan yanıtlar (yedek)
     DEFAULT_UNKNOWN_RESPONSE = "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz."
