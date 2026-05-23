@@ -7,10 +7,10 @@ from utils.config import Config
 
 
 class Orchestrator:
-    def __init__(self):
+    def __init__(self, debug_mode=False):
         self.config = Config()
         self.logger = Logger(log_dir=self.config.STORAGE_DIR, log_file=self.config.LOG_FILE)
-        self.router = LLMRouter(model=self.router.model)
+        self.router = LLMRouter(model=self.config.LLM_MODEL)
         self.chat = ChatModule(router=self.router)
         self.memory = MemoryManager()
         self.task_mgr = TaskManager(storage_dir=self.config.STORAGE_DIR)

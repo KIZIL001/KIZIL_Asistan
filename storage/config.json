@@ -1,0 +1,10 @@
+{
+  "STORAGE_DIR": "storage",
+  "CONVERSATIONS_DIR": "conversations",
+  "MEMORY_DIR": "memory",
+  "LOG_FILE": "kizil.log",
+  "LOG_LEVEL": "DEBUG",
+  "LLM_MODEL": "phi3:mini",
+  "SUMMARY_MAX_LINES": 50,
+  "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz."
+}

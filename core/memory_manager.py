@@ -6,15 +6,16 @@ from utils.config import Config
 
 class MemoryManager:
     def __init__(self):
-        self.storage_path = Config.STORAGE_DIR
-        self.conversations_dir = os.path.join(self.storage_path, Config.CONVERSATIONS_DIR)
-        self.memory_dir = os.path.join(self.storage_path, Config.MEMORY_DIR)
+        self.config = Config()
+        self.storage_path = self.config.STORAGE_DIR
+        self.conversations_dir = os.path.join(self.storage_path, self.config.CONVERSATIONS_DIR)
+        self.memory_dir = os.path.join(self.storage_path, self.config.MEMORY_DIR)
         self.conversation_file = os.path.join(self.conversations_dir, "gunluk.txt")
 
         os.makedirs(self.conversations_dir, exist_ok=True)
         os.makedirs(self.memory_dir, exist_ok=True)
 
-        self.context = deque(maxlen=Config.SUMMARY_MAX_LINES)
+        self.context = deque(maxlen=self.config.SUMMARY_MAX_LINES)
 
     def add_to_context(self, role: str, message: str):
         self.context.append({"role": role, "content": message})
@@ -37,7 +38,7 @@ class MemoryManager:
         return "".join(lines[-max_lines:])
 
     def summarize_and_save(self, model_name, chat_module):
-        recent = self._read_last_lines(Config.SUMMARY_MAX_LINES)
+        recent = self._read_last_lines(self.config.SUMMARY_MAX_LINES)
         if not recent.strip():
             return None, "Henüz kayıtlı konuşma yok."
 
