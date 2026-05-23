@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+storage/kizil.log
+storage/conversations/gunluk.txt
+storage/tasks.json
