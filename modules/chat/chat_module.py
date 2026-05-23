@@ -2,35 +2,38 @@ import ollama
 from utils.config import Config
 
 class ChatModule:
-    """Ollama tabanlı sohbet modülü. Hata durumunda basit yanıtlar üretir."""
+    """Ollama tabanlı sohbet modülü. Kısa süreli hafıza (context) kullanır."""
 
     def __init__(self, model=None):
         self.config = Config()
         self.model = model if model else self.config.LLM_MODEL
 
-    def _llm_yanit(self, mesaj):
-        """Ollama modeline soru sor ve cevabı döndür."""
+    def _llm_yanit(self, mesaj, context=None):
+        """Ollama modeline soru sor ve cevabı döndür. Geçmiş sohbeti context olarak ekler."""
         try:
+            messages = []
+            if context:
+                messages.extend(context)  # önceki konuşmaları ekle
+            messages.append({"role": "user", "content": mesaj})
+
             response = ollama.chat(
                 model=self.model,
-                messages=[{"role": "user", "content": mesaj}]
+                messages=messages
             )
             return response["message"]["content"].strip()
         except Exception as e:
-            # Ollama çalışmıyorsa ya da başka hata varsa fallback
             print(f"(Uyarı: LLM hatası - {e}. Varsayılan yanıt kullanılıyor.)")
             return None
 
-    def yanit_ver(self, girdi: str) -> str:
+    def yanit_ver(self, girdi: str, context=None) -> str:
         if not girdi or not girdi.strip():
             return "Bir şey demedin, tekrar dene."
 
-        # Önce yapay zekâya sor
-        cevap = self._llm_yanit(girdi)
+        cevap = self._llm_yanit(girdi, context)
         if cevap:
             return cevap
 
-        # Yapay zekâ cevap veremediyse basit yedek kurallara dön
+        # Yedek basit yanıtlar
         girdi = girdi.strip().lower()
         if "merhaba" in girdi or "selam" in girdi:
             return "Merhaba! Nasıl yardımcı olabilirim?"

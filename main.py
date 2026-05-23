@@ -9,11 +9,10 @@ def main():
     logger.info("KIZIL Asistan başlatılıyor...")
 
     chat = ChatModule()
-    memory = MemoryManager(storage_path=config.STORAGE_DIR)
+    memory = MemoryManager()
 
     logger.info("Modüller yüklendi.")
     logger.info(f"Depolama dizini: {config.STORAGE_DIR}")
-    logger.debug(f"Log dosyası: {config.LOG_FILE}")
 
     print("KIZIL Asistan başlatıldı.")
     print("Sohbet etmek için yaz, çıkmak için 'çık' ya da 'exit' yaz.\n")
@@ -30,9 +29,18 @@ def main():
                 logger.info("Kullanıcı çıkış komutu girdi.")
                 break
 
-            cevap = chat.yanit_ver(girdi)
+            # Hafızadan şu ana kadarki konuşma geçmişini al
+            context = memory.get_context()
+
+            # Cevabı üret
+            cevap = chat.yanit_ver(girdi, context)
             print(f"KIZIL: {cevap}")
 
+            # Yeni mesajları hafızaya ekle (önce kullanıcı, sonra asistan)
+            memory.add_to_context("user", girdi)
+            memory.add_to_context("assistant", cevap)
+
+            # Dosyaya kaydet
             memory.save_conversation(girdi, cevap)
             logger.debug(f"Konuşma kaydedildi: {girdi} -> {cevap}")
 
