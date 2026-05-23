@@ -1,6 +1,7 @@
 from modules.chat.chat_module import ChatModule
-from core.memory_manager import MemoryManager
+from core.llm_router import LLMRouter
 from modules.tasks.task_manager import TaskManager
+from core.memory_manager import MemoryManager
 from utils.logger import Logger
 from utils.config import Config
 
@@ -10,7 +11,8 @@ class Orchestrator:
     def __init__(self):
         self.config = Config()
         self.logger = Logger(log_dir=self.config.STORAGE_DIR, log_file=self.config.LOG_FILE)
-        self.chat = ChatModule()
+        self.router = LLMRouter(model=self.config.LLM_MODEL)
+        self.chat = ChatModule(router=self.router)
         self.memory = MemoryManager()
         self.task_mgr = TaskManager(storage_dir=self.config.STORAGE_DIR)
         self.running = False

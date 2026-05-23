@@ -1,80 +1,55 @@
 import json
 import os
-from datetime import datetime
+import uuid
+
 
 class TaskManager:
-    """Basit görev yöneticisi. Görevleri JSON dosyasında saklar."""
-
-    def __init__(self, storage_dir="storage"):
+    def __init__(self, storage_dir: str):
         self.storage_dir = storage_dir
-        self.tasks_file = os.path.join(storage_dir, "tasks.json")
-        os.makedirs(storage_dir, exist_ok=True)
+        self.file_path = os.path.join(storage_dir, "tasks.json")
         self._ensure_file()
 
     def _ensure_file(self):
-        """JSON dosyası yoksa boş liste ile oluştur."""
-        if not os.path.exists(self.tasks_file):
-            with open(self.tasks_file, "w", encoding="utf-8") as f:
-                json.dump([], f)
+        os.makedirs(self.storage_dir, exist_ok=True)
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump([], f, indent=2)
 
-    def _read_tasks(self):
-        """Tüm görevleri listede döndür."""
-        with open(self.tasks_file, "r", encoding="utf-8") as f:
+    def _load(self) -> list:
+        with open(self.file_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def _write_tasks(self, tasks):
-        """Görev listesini dosyaya yaz."""
-        with open(self.tasks_file, "w", encoding="utf-8") as f:
+    def _save(self, tasks: list):
+        with open(self.file_path, "w", encoding="utf-8") as f:
             json.dump(tasks, f, indent=2, ensure_ascii=False)
 
-    def add_task(self, description):
-        """Yeni görev ekle."""
-        tasks = self._read_tasks()
+    def add_task(self, desc: str) -> dict:
+        tasks = self._load()
         task = {
-            "id": len(tasks) + 1,
-            "description": description,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "id": str(uuid.uuid4())[:8],
+            "desc": desc,
             "done": False
         }
         tasks.append(task)
-        self._write_tasks(tasks)
+        self._save(tasks)
         return task
 
-    def list_tasks(self):
-        """Tüm görevleri listele, metin olarak döndür."""
-        tasks = self._read_tasks()
-        if not tasks:
-            return "Henüz hiç görev eklenmemiş."
-        lines = []
-        for t in tasks:
-            durum = "✓" if t["done"] else "☐"
-            lines.append(f"{durum} [{t['id']}] {t['description']} ({t['created_at']})")
-        return "\n".join(lines)
+    def list_tasks(self) -> list:
+        return self._load()
 
-    def delete_task(self, task_id):
-        """Belirtilen ID'li görevi sil."""
-        tasks = self._read_tasks()
-        try:
-            task_id = int(task_id)
-        except ValueError:
-            return "Geçersiz görev numarası."
-        for t in tasks:
-            if t["id"] == task_id:
-                tasks.remove(t)
-                self._write_tasks(tasks)
-                return f"Görev #{task_id} silindi."
-        return f"Görev #{task_id} bulunamadı."
+    def delete_task(self, task_id: str) -> bool:
+        tasks = self._load()
+        filtered = [t for t in tasks if t["id"] != task_id]
+        if len(filtered) == len(tasks):
+            return False
+        self._save(filtered)
+        return True
 
-    def mark_done(self, task_id):
-        """Görevi tamamlandı olarak işaretle."""
-        tasks = self._read_tasks()
-        try:
-            task_id = int(task_id)
-        except ValueError:
-            return "Geçersiz görev numarası."
+    def mark_done(self, task_id: str) -> bool:
+        tasks = self._load()
         for t in tasks:
             if t["id"] == task_id:
                 t["done"] = True
-                self._write_tasks(tasks)
-                return f"Görev #{task_id} tamamlandı olarak işaretlendi."
-        return f"Görev #{task_id} bulunamadı."
+                self._save(tasks)
+                return True
+        return False
