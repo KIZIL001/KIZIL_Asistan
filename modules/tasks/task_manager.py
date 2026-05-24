@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 import threading
+import tempfile
 
 
 class TaskManager:
@@ -19,8 +20,16 @@ class TaskManager:
 
     def _save(self, tasks: list):
         os.makedirs(self.storage_dir, exist_ok=True)
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            json.dump(tasks, f, indent=2, ensure_ascii=False)
+        tmp_fd, tmp_path = None, None
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=self.storage_dir)
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(tasks, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, self.file_path)
+        except Exception:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
 
     def add_task(self, desc: str) -> dict:
         with self._lock:

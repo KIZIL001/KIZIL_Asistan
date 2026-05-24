@@ -14,7 +14,8 @@ def _normalize_text(text: str) -> str:
     return WHITESPACE_RE.sub(' ', text).strip()
 
 
-def _safe_session() -> requests.Session:
+def _make_session() -> requests.Session:
+    """Her çağrı için yeni bir Session oluşturur. Çağıran with ile kullanmalı."""
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT})
     session.verify = True
@@ -26,8 +27,8 @@ def _web_oku(url: str) -> str:
     if not url.startswith(("http://", "https://")):
         return "Hata: URL http:// veya https:// ile başlamalıdır."
     try:
-        session = _safe_session()
-        resp = session.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
+        with _make_session() as session:
+            resp = session.get(url, timeout=REQUEST_TIMEOUT, allow_redirects=True)
         resp.raise_for_status()
         if resp.apparent_encoding and resp.encoding != resp.apparent_encoding:
             resp.encoding = resp.apparent_encoding
@@ -81,9 +82,9 @@ def _web_ara(sorgu: str) -> str:
 
 def _hava_durumu(sehir: str) -> str:
     try:
-        session = _safe_session()
         url = f"https://wttr.in/{sehir}?format=%C+%t+%w+%h&lang=tr"
-        resp = session.get(url, timeout=5, allow_redirects=True)
+        with _make_session() as session:
+            resp = session.get(url, timeout=5, allow_redirects=True)
         resp.raise_for_status()
         return f"{sehir} hava durumu: {resp.text.strip()}"
     except requests.exceptions.SSLError:

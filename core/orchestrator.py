@@ -1,4 +1,5 @@
 import os
+from collections import deque
 from datetime import datetime
 from modules.chat.chat_module import ChatModule
 from core.llm_router import LLMRouter
@@ -89,7 +90,7 @@ class Orchestrator:
             self.logger.info(f"Pluginler yüklendi: {', '.join(yuklenenler)}")
 
         self._mesaj_sayaci = 0
-        self._action_history: list[dict] = []
+        self._action_history: deque[dict] = deque(maxlen=100)
         self.running = False
 
     # ========================================================================
@@ -344,7 +345,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
 
     def _chat(self, msg: str) -> None:
         def istek():
-            ctx = self.memory.get_context()
+            ctx = self.memory.get_short_term()
             resp = self.chat.yanit_ver(msg, ctx)
             print("KIZIL:", resp)
             return resp
@@ -352,8 +353,8 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         resp = self._safe_llm(istek)
         if resp is not None:
             self.memory.save_conversation(msg, resp)
-            self.memory.add_to_context("user", msg)
-            self.memory.add_to_context("assistant", resp)
+            self.memory.add_short_term("user", msg)
+            self.memory.add_short_term("assistant", resp)
             self._mesaj_sayaci += 2
             if self._mesaj_sayaci >= AUTO_SUMMARIZE_THRESHOLD:
                 self._summary()
@@ -401,8 +402,8 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         resp = self._safe_llm(istek)
         if resp is not None:
             self.memory.save_conversation(girdi, resp)
-            self.memory.add_to_context("user", girdi)
-            self.memory.add_to_context("assistant", resp)
+            self.memory.add_short_term("user", girdi)
+            self.memory.add_short_term("assistant", resp)
 
     def _reset_context(self) -> None:
         self.memory.context.clear()

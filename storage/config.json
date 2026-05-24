@@ -6,5 +6,6 @@
   "LOG_LEVEL": "DEBUG",
   "LLM_MODEL": "llama3.2:3b",
   "SUMMARY_MAX_LINES": 50,
-  "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz."
+  "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz.",
+  "test_key": "value_4_9"
 }

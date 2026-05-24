@@ -54,8 +54,9 @@ class ToolManager:
             try:
                 params = json.loads(raw_params.strip()) if raw_params.strip() else {}
             except json.JSONDecodeError:
-                first_line = raw_params.strip().split("\n")[0]
-                params = {"input": first_line} if first_line else {}
+                snippet = raw_params.strip()[:80]
+                results.append(f"[HATA] JSON bozuk, çağrı atlandı: {snippet}...")
+                continue
             try:
                 func = self.tools[tool_name]["func"]
                 filtered = self._filter_params(func, params)

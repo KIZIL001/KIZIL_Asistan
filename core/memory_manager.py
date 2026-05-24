@@ -64,11 +64,7 @@ class MemoryManager:
     def clear_short_term(self) -> None:
         self.context.clear()
 
-    def add_to_context(self, role: str, message: str) -> None:
-        self.add_short_term(role, message)
 
-    def get_context(self) -> list:
-        return self.get_short_term()
 
     # ========================================================================
     # UZUN SÜRELİ HAFIZA (Long-Term Memory) - Embedding
@@ -137,21 +133,23 @@ class MemoryManager:
 
     def save_conversation(self, user_input: str, response: str):
         zaman = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with open(self.conversation_file, "a", encoding="utf-8") as f:
-                f.write(f"{zaman} | Kullanici: {user_input}\n")
-                f.write(f"{zaman} | KIZIL: {response}\n")
-                f.write("-" * 30 + "\n")
-        except Exception as e:
-            self._log("error", f"Konuşma kaydedilemedi: {e}")
+        with self._lock:
+            try:
+                with open(self.conversation_file, "a", encoding="utf-8") as f:
+                    f.write(f"{zaman} | Kullanici: {user_input}\n")
+                    f.write(f"{zaman} | KIZIL: {response}\n")
+                    f.write("-" * 30 + "\n")
+            except Exception as e:
+                self._log("error", f"Konuşma kaydedilemedi: {e}")
 
-        self.add_long_term(f"Kullanici: {user_input}\nKIZIL: {response}")
+            self.add_long_term(f"Kullanici: {user_input}\nKIZIL: {response}")
 
     def _read_last_lines(self, max_lines: int) -> str:
         if not os.path.exists(self.conversation_file):
             return ""
-        with open(self.conversation_file, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        with self._lock:
+            with open(self.conversation_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
         return "".join(lines[-max_lines:])
 
     def _clean_old_summaries(self):
@@ -180,11 +178,30 @@ class MemoryManager:
         recent = self._read_last_lines(self.config.SUMMARY_MAX_LINES)
         if not recent.strip():
             return None, "Henüz kayıtlı konuşma yok."
-        prompt = (
-            "Aşağıdaki konuşma kaydından önemli noktaları, alınan kararları "
-            "ve kullanıcı hakkında edinilen bilgileri kısa bir özet halinde çıkar. "
-            "Sadece özeti yaz, başka bir şey yazma:\n\n" + recent
-        )
+
+        # Önceki özetleri bağlam olarak al
+        onceki_ozetler = self._load_all_summaries()
+        onceki_parcalar = onceki_ozetler.split("\n\n---\n\n")
+        son_ozetler = "\n---\n".join(onceki_parcalar[-MAX_OZET_CONTEXT:]) if onceki_ozetler.strip() else ""
+
+        if son_ozetler:
+            prompt = (
+                "GÖREV: Aşağıdaki önceki özetleri ve son konuşma kaydını kullanarak "
+                "güncel bir birleşik özet çıkar.\n"
+                "KURALLAR:\n"
+                "1. Önceki özetlerdeki bilgileri aynen tekrar etme, onları özetle.\n"
+                "2. Sadece yeni ve değişen bilgileri ekle.\n"
+                "3. Sonuç tek bir kısa paragraf olsun.\n"
+                "4. Sadece özeti yaz, başka bir şey yazma.\n\n"
+                "ÖNCEKİ ÖZETLER:\n" + son_ozetler + "\n\n"
+                "SON KONUŞMA KAYDI:\n" + recent
+            )
+        else:
+            prompt = (
+                "Aşağıdaki konuşma kaydından önemli noktaları, alınan kararları "
+                "ve kullanıcı hakkında edinilen bilgileri kısa bir özet halinde çıkar. "
+                "Sadece özeti yaz, başka bir şey yazma:\n\n" + recent
+            )
         try:
             summary = chat_module._llm_yanit(prompt)
         except Exception as e:
@@ -207,12 +224,13 @@ class MemoryManager:
     def _load_all_summaries(self) -> str:
         if not os.path.exists(self.memory_dir):
             return ""
-        tum_ozetler = []
-        for dosya in sorted(os.listdir(self.memory_dir)):
-            if dosya.endswith(".txt") and dosya.startswith("ozet_"):
-                dosya_yolu = os.path.join(self.memory_dir, dosya)
-                with open(dosya_yolu, "r", encoding="utf-8") as f:
-                    tum_ozetler.append(f.read())
+        with self._lock:
+            tum_ozetler = []
+            for dosya in sorted(os.listdir(self.memory_dir)):
+                if dosya.endswith(".txt") and dosya.startswith("ozet_"):
+                    dosya_yolu = os.path.join(self.memory_dir, dosya)
+                    with open(dosya_yolu, "r", encoding="utf-8") as f:
+                        tum_ozetler.append(f.read())
         return "\n\n---\n\n".join(tum_ozetler)
 
     # ========================================================================

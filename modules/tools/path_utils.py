@@ -27,10 +27,14 @@ def safe_path(path: str, base_dir: str | None = None, must_exist: bool = False) 
         base_dir = os.getcwd()
     base_resolved = os.path.realpath(os.path.abspath(base_dir))
 
-    # Windows/macOS case-insensitive dosya sistemleri için normcase
-    if sys.platform in ("win32", "darwin"):
+    # Windows/macOS case-insensitive dosya sistemleri için normalizasyon
+    if sys.platform == "win32":
         resolved_check = os.path.normcase(resolved)
         base_check = os.path.normcase(base_resolved)
+    elif sys.platform == "darwin":
+        # macOS APFS varsayılan olarak case-insensitive, normcase hiçbir şey yapmaz
+        resolved_check = resolved.lower()
+        base_check = base_resolved.lower()
     else:
         resolved_check = resolved
         base_check = base_resolved

@@ -155,6 +155,7 @@ def _dosya_ara(dizin: str, isim: str) -> str:
             continue
         dir_count += 1
         if dir_count > max_dirs:
+            dirs[:] = []
             break
         for f in files:
             if isim.lower() in f.lower():
