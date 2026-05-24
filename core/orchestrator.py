@@ -19,7 +19,16 @@ AUTO_SUMMARIZE_THRESHOLD = 20
 
 
 class Orchestrator:
-    def __init__(self, debug_mode=False):
+    """
+    KIZIL Asistan'ın merkezi sinir sistemi.
+    Tüm modülleri başlatır, komutları yönlendirir, yaşam döngüsünü yönetir.
+    """
+
+    # ========================================================================
+    # BAŞLATMA VE KONFİGÜRASYON
+    # ========================================================================
+
+    def __init__(self, debug_mode: bool = False) -> None:
         self.config = Config()
         self.logger = Logger(
             log_dir=self.config.STORAGE_DIR,
@@ -27,7 +36,7 @@ class Orchestrator:
             log_level=self.config.LOG_LEVEL,
             debug_mode=debug_mode,
         )
-        self.router = LLMRouter(model=self.config.LLM_MODEL)
+        self.router = LLMRouter(model=self.config.LLM_MODEL, logger=self.logger)
         self.chat = ChatModule(router=self.router)
         self.memory = MemoryManager()
         self.task_mgr = TaskManager(storage_dir=self.config.STORAGE_DIR)
@@ -47,9 +56,6 @@ class Orchestrator:
         self.chat.set_tool_manager(self.tool_manager)
         self.chat.set_profile_prompt(self.profile.get_prompt())
 
-        # Undo mekanizması
-        self._last_action: dict | None = None  # {"type": "task_add"|"task_del"|"task_done", "data": ...}
-
         self.command_map = {
             "özetle": self._summary,
             "sıfırla": self._reset_context,
@@ -65,17 +71,17 @@ class Orchestrator:
             "geri al": self._undo,
         }
 
-        self.param_commands = [
-            ("hatırla ", self._remember),
-            ("görev ekle ", self._task_add),
-            ("görev sil ", self._task_del),
-            ("görev tamam ", self._task_done),
-            ("görev zincirle ", self._task_chain),
-            ("model ", self._change_model),
-            ("profil ", self._profile_cmd),
-            ("ayar ", self._config_cmd),
-            ("karaliste temizle", lambda _: self._clear_blacklist()),
-        ]
+        self.param_tokens = {
+            ("hatırla",): self._remember,
+            ("görev", "ekle"): self._task_add,
+            ("görev", "sil"): self._task_del,
+            ("görev", "tamam"): self._task_done,
+            ("görev", "zincirle"): self._task_chain,
+            ("model",): self._change_model,
+            ("profil",): self._profile_cmd,
+            ("ayar",): self._config_cmd,
+            ("karaliste", "temizle"): lambda x: self._clear_blacklist(),
+        }
 
         self.plugin_loader = PluginLoader(self)
         yuklenenler = self.plugin_loader.load_all()
@@ -83,7 +89,12 @@ class Orchestrator:
             self.logger.info(f"Pluginler yüklendi: {', '.join(yuklenenler)}")
 
         self._mesaj_sayaci = 0
+        self._action_history: list[dict] = []
         self.running = False
+
+    # ========================================================================
+    # ARAÇ KAYIT
+    # ========================================================================
 
     def _register_task_tools(self) -> None:
         self.tool_manager.register(
@@ -120,29 +131,35 @@ class Orchestrator:
         except Exception as e:
             return f"Görevler listelenemedi: {e}"
 
-    def start(self):
+    # ========================================================================
+    # ANA DÖNGÜ
+    # ========================================================================
+
+    def start(self) -> None:
         self.running = True
         self.session.start_session()
         self.logger.info("KIZIL Asistan başlatılıyor...")
         print("KIZIL Asistan başlatıldı.")
         print("Komutlar için 'yardım' yazabilirsin.\n")
-        while self.running:
-            try:
-                girdi = input("Sen: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                self.stop()
-                break
-            if not girdi:
-                continue
-            self._process(girdi)
+        try:
+            while self.running:
+                try:
+                    girdi = input("Sen: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    break
+                if not girdi:
+                    continue
+                self._process(girdi)
+        finally:
+            self.stop()
 
-    def _process(self, girdi):
+    def _process(self, girdi: str) -> None:
         self.logger.info(f"Kullanıcı girdisi: {girdi}")
         try:
             komut = girdi.lower().strip()
 
             if komut in ("çık", "exit", "quit", "q"):
-                self.stop()
+                self.running = False
                 return
             if komut in ("yardım", "yardim", "help", "h"):
                 self._help()
@@ -152,10 +169,13 @@ class Orchestrator:
                 self.command_map[komut]()
                 return
 
-            for prefix, handler in self.param_commands:
-                if komut.startswith(prefix):
-                    handler(girdi)
-                    return
+            tokens = komut.split()
+            if tokens:
+                for key_tokens, handler in self.param_tokens.items():
+                    if len(tokens) >= len(key_tokens):
+                        if all(tokens[i] == key_tokens[i] for i in range(len(key_tokens))):
+                            handler(girdi)
+                            return
 
             self._chat(girdi)
 
@@ -163,7 +183,11 @@ class Orchestrator:
             self.logger.error(f"İşlem hatası: {e}", exc_info=True)
             print("KIZIL: Bir hata oluştu. Lütfen tekrar dene.")
 
-    def _help(self):
+    # ========================================================================
+    # YARDIM
+    # ========================================================================
+
+    def _help(self) -> None:
         print("""
 KIZIL Asistan - Komut Listesi
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -189,157 +213,136 @@ oturumlar                     → geçmiş oturumları listele
 dışa aktar                    → konuşma günlüğünü dışa aktar
 profil                        → profil bilgilerini göster
 profil <anahtar> <değer>      → profil alanını güncelle (ad, tercih, not)
-durum                         → asistan performans raporu
+durum                         → asistan performans metriklerini göster
 karaliste                     → devre dışı bırakılan araçları listele
 karaliste temizle             → kara listeyi ve panik modunu sıfırla
         """.strip())
 
-    def _profile_cmd(self, girdi):
+    # ========================================================================
+    # PROFİL KOMUTLARI
+    # ========================================================================
+
+    def _profile_cmd(self, girdi: str) -> None:
         parcalar = girdi.split(maxsplit=3)
         if len(parcalar) == 1:
-            veri = self.profile.get_all()
-            print("KIZIL: Kullanıcı Profili")
-            for k, v in veri.items():
-                if v:
-                    print(f"  {k}: {v}")
-                else:
-                    print(f"  {k}: (boş)")
+            self._profile_show()
         elif len(parcalar) == 2:
             print("KIZIL: Kullanım: profil <anahtar> <değer>")
             print("  Örnek: profil ad Esat")
         elif len(parcalar) >= 3:
             anahtar = parcalar[1].lower()
+            deger = parcalar[2]
             if anahtar == "ad":
-                deger = parcalar[2]
-                self.profile.set("ad", deger)
-                print(f"KIZIL: İsmin '{deger}' olarak kaydedildi.")
+                self._profile_set_ad(deger)
             elif anahtar == "tercih":
                 if len(parcalar) >= 4:
-                    tercih_adi = parcalar[2]
-                    tercih_deger = parcalar[3]
-                    self.profile._data.setdefault("tercihler", {})
-                    self.profile._data["tercihler"][tercih_adi] = tercih_deger
-                    self.profile.save()
-                    print(f"KIZIL: Tercih '{tercih_adi}' = '{tercih_deger}' kaydedildi.")
+                    self._profile_set_tercih(parcalar[2], parcalar[3])
                 else:
                     print("KIZIL: Kullanım: profil tercih <ad> <değer>")
                     print("  Örnek: profil tercih renk kırmızı")
             elif anahtar == "not":
-                deger = parcalar[2]
-                self.profile.set("notlar", deger)
-                print("KIZIL: Not kaydedildi.")
+                self._profile_set_not(deger)
             elif anahtar == "model":
-                deger = parcalar[2]
-                self.profile.set("model", deger)
-                print(f"KIZIL: Tercih ettiğin model '{deger}' olarak kaydedildi.")
+                self._profile_set_model(deger)
             else:
-                deger = parcalar[2]
                 self.profile.set(anahtar, deger)
                 print(f"KIZIL: '{anahtar}' = '{deger}' olarak kaydedildi.")
             self.chat.set_profile_prompt(self.profile.get_prompt())
 
-    def _reset_context(self):
-        self.memory.context.clear()
-        self._mesaj_sayaci = 0
-        print("KIZIL: Konuşma geçmişi temizlendi.")
+    def _profile_show(self) -> None:
+        veri = self.profile.get_all()
+        print("KIZIL: Kullanıcı Profili")
+        for k, v in veri.items():
+            if v:
+                print(f"  {k}: {v}")
+            else:
+                print(f"  {k}: (boş)")
 
-    def _show_errors(self):
-        log_path = os.path.join(self.config.STORAGE_DIR, self.config.LOG_FILE)
-        if not os.path.exists(log_path):
-            print("KIZIL: Henüz log dosyası oluşmamış.")
-            return
-        with open(log_path, "r", encoding="utf-8") as f:
-            lines = [line for line in f.readlines() if "[ERROR]" in line]
-        if not lines:
-            print("KIZIL: Hiç hata kaydı bulunamadı.")
-            return
-        print("KIZIL: Son 10 hata kaydı:")
-        for line in lines[-10:]:
-            print(f"  {line.strip()}")
+    def _profile_set_ad(self, deger: str) -> None:
+        self.profile.set("ad", deger)
+        print(f"KIZIL: İsmin '{deger}' olarak kaydedildi.")
 
-    def _show_sessions(self):
-        sessions = self.session.list_sessions()
-        if not sessions:
-            print("KIZIL: Henüz oturum kaydı yok.")
-            return
-        print("KIZIL: Geçmiş oturumlar:")
-        for s in sessions:
-            durum = "✅" if s.get("end") else "🔄"
-            print(f"  {durum} {s['id']} | {s['start']} → {s.get('end', 'devam ediyor')}")
+    def _profile_set_tercih(self, ad: str, deger: str) -> None:
+        tercihler = self.profile.get("tercihler", {})
+        tercihler[ad] = deger
+        self.profile.set("tercihler", tercihler)
+        print(f"KIZIL: Tercih '{ad}' = '{deger}' kaydedildi.")
 
-    def _export_conversation(self):
-        src = self.memory.conversation_file
-        if not os.path.exists(src):
-            print("KIZIL: Dışa aktarılacak konuşma günlüğü bulunamadı.")
-            return
-        tarih = datetime.now().strftime("%Y%m%d_%H%M%S")
-        dst = os.path.join(self.config.STORAGE_DIR, f"export_{tarih}.txt")
-        with open(src, "r", encoding="utf-8") as f_in:
-            with open(dst, "w", encoding="utf-8") as f_out:
-                f_out.write("KIZIL Asistan Konuşma Dışa Aktarımı\n")
-                f_out.write(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f_out.write("-" * 40 + "\n")
-                f_out.write(f_in.read())
-        print(f"KIZIL: Konuşma günlüğü dışa aktarıldı: {dst}")
+    def _profile_set_not(self, deger: str) -> None:
+        self.profile.set("notlar", deger)
+        print("KIZIL: Not kaydedildi.")
 
-    def _change_model(self, girdi):
-        yeni = girdi.split(maxsplit=1)[1].strip() if " " in girdi else ""
-        if not yeni:
-            print("KIZIL: Örnek: model phi3:mini")
-            return
-        self.router.model = yeni
-        self.config.set("LLM_MODEL", yeni)
-        self.chat.set_profile_prompt(self.profile.get_prompt())
-        print(f"KIZIL: Model '{yeni}' olarak değiştirildi.")
+    def _profile_set_model(self, deger: str) -> None:
+        self.profile.set("model", deger)
+        print(f"KIZIL: Tercih ettiğin model '{deger}' olarak kaydedildi.")
 
-    def _config_cmd(self, girdi):
+    # ========================================================================
+    # KONFİGÜRASYON KOMUTLARI
+    # ========================================================================
+
+    def _config_cmd(self, girdi: str) -> None:
         parcalar = girdi.split(maxsplit=2)
         if len(parcalar) == 1:
-            print("KIZIL: Mevcut ayarlar:")
-            for k, v in self.config._data.items():
-                print(f"  {k} = {v}")
+            self._config_show_all()
         elif len(parcalar) == 2:
             anahtar = parcalar[1].upper()
             if anahtar == "SIFIRLA":
-                self.config._data = self.config._defaults()
-                self.config.save()
-                self.router.model = self.config.LLM_MODEL
-                self.memory.context.clear()
-                self.chat.set_profile_prompt(self.profile.get_prompt())
-                print("KIZIL: Tüm ayarlar varsayılana döndürüldü.")
-                return
-            try:
-                deger = getattr(self.config, anahtar)
-                print(f"KIZIL: {anahtar} = {deger}")
-            except AttributeError:
-                print(f"KIZIL: '{anahtar}' diye bir ayar bulunamadı.")
+                self._config_reset_all()
+            else:
+                self._config_show_one(anahtar)
         else:
-            anahtar = parcalar[1].upper()
-            deger = parcalar[2]
-            try:
-                getattr(self.config, anahtar)
-                self.config.set(anahtar, deger)
-                if anahtar == "LLM_MODEL":
-                    self.router.model = deger
-                print(f"KIZIL: {anahtar} = {deger} olarak güncellendi.")
-            except AttributeError:
-                print(f"KIZIL: '{anahtar}' diye bir ayar bulunamadı.")
+            self._config_set(parcalar[1].upper(), parcalar[2])
+
+    def _config_show_all(self) -> None:
+        print("KIZIL: Mevcut ayarlar:")
+        for k, v in self.config._data.items():
+            print(f"  {k} = {v}")
+
+    def _config_show_one(self, anahtar: str) -> None:
+        try:
+            deger = getattr(self.config, anahtar)
+            print(f"KIZIL: {anahtar} = {deger}")
+        except AttributeError:
+            print(f"KIZIL: '{anahtar}' diye bir ayar bulunamadı.")
+
+    def _config_set(self, anahtar: str, deger: str) -> None:
+        try:
+            getattr(self.config, anahtar)
+            self.config.set(anahtar, deger)
+            if anahtar == "LLM_MODEL":
+                self.router.model = deger
+            print(f"KIZIL: {anahtar} = {deger} olarak güncellendi.")
+        except AttributeError:
+            print(f"KIZIL: '{anahtar}' diye bir ayar bulunamadı.")
+
+    def _config_reset_all(self) -> None:
+        self.config._data = self.config._defaults()
+        self.config.save()
+        self.router.model = self.config.LLM_MODEL
+        self.memory.context.clear()
+        self.chat.set_profile_prompt(self.profile.get_prompt())
+        print("KIZIL: Tüm ayarlar varsayılana döndürüldü.")
+
+    # ========================================================================
+    # LLM İŞLEMLERİ
+    # ========================================================================
 
     def _safe_llm(self, func, *args):
         try:
             return func(*args)
-        except ConnectionError:
-            print("KIZIL: LLM baglantisi kurulamadi.")
-            print("  -> Ollama calisiyor mu? (http://localhost:11434)")
-            print("  -> Model yuklu mu? 'ollama list' ile kontrol et.")
+        except (ConnectionError, TimeoutError, OSError) as e:
+            self.logger.error(f"LLM bağlantı/zaman aşımı hatası: {e}")
+            print("KIZIL: LLM bağlantısı kurulamadı veya zaman aşımına uğradı.")
+            print("  -> Ollama çalışıyor mu? (http://localhost:11434)")
+            print("  -> Model yüklü mü? 'ollama list' ile kontrol et.")
             return None
         except Exception as e:
-            self.logger.error(f"LLM hatasi: {e}", exc_info=True)
-            print("KIZIL: LLM cagrisi sirasinda hata olustu.")
+            self.logger.error(f"LLM hatası: {e}", exc_info=True)
+            print("KIZIL: LLM çağrısı sırasında hata oluştu.")
             print(f"  -> Hata: {e}")
             return None
 
-    def _chat(self, msg):
+    def _chat(self, msg: str) -> None:
         def istek():
             ctx = self.memory.get_context()
             resp = self.chat.yanit_ver(msg, ctx)
@@ -356,7 +359,21 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
                 self._summary()
                 self._mesaj_sayaci = 0
 
-    def _summary(self):
+    def _change_model(self, girdi: str) -> None:
+        yeni = girdi.split(maxsplit=1)[1].strip() if " " in girdi else ""
+        if not yeni:
+            print("KIZIL: Örnek: model phi3:mini")
+            return
+        self.router.model = yeni
+        self.config.set("LLM_MODEL", yeni)
+        self.chat.set_profile_prompt(self.profile.get_prompt())
+        print(f"KIZIL: Model '{yeni}' olarak değiştirildi.")
+
+    # ========================================================================
+    # ÖZET VE HAFIZA
+    # ========================================================================
+
+    def _summary(self) -> None:
         def istek():
             f, s = self.memory.summarize_and_save(self.router.model, self.chat)
             if f:
@@ -370,7 +387,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
 
         self._safe_llm(istek)
 
-    def _remember(self, girdi):
+    def _remember(self, girdi: str) -> None:
         q = girdi.split(maxsplit=1)[1].strip() if " " in girdi else ""
         if not q:
             print("KIZIL: Ne hakkında hatırlatma yapmamı istersin?")
@@ -387,7 +404,16 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             self.memory.add_to_context("user", girdi)
             self.memory.add_to_context("assistant", resp)
 
-    def _task_add(self, girdi):
+    def _reset_context(self) -> None:
+        self.memory.context.clear()
+        self._mesaj_sayaci = 0
+        print("KIZIL: Konuşma geçmişi temizlendi.")
+
+    # ========================================================================
+    # GÖREV KOMUTLARI
+    # ========================================================================
+
+    def _task_add(self, girdi: str) -> None:
         parcalar = girdi.split(maxsplit=2)
         if len(parcalar) < 3:
             print("KIZIL: Örnek: görev ekle markete git")
@@ -395,13 +421,13 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         desc = parcalar[2].strip()
         try:
             t = self.task_mgr.add_task(desc)
-            self._last_action = {"type": "task_add", "id": t["id"]}
+            self._action_history.append({"type": "task_add", "id": t["id"]})
             print(f"KIZIL: Görev eklendi: [{t['id']}] {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev ekleme hatası: {e}")
             print("KIZIL: Görev eklenemedi.")
 
-    def _task_list(self):
+    def _task_list(self) -> None:
         try:
             tasks = self.task_mgr.list_tasks()
             if not tasks:
@@ -409,24 +435,24 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
                 return
             for t in tasks:
                 durum = "✓" if t.get("done") else "☐"
-                zincir = ""
-                if t.get("depends_on"):
-                    zincir = f" ⛓→{t['depends_on']}"
+                zincir = f" ⛓→{t['depends_on']}" if t.get("depends_on") else ""
                 print(f"  {durum} [{t['id']}]{zincir} {t['desc']}")
         except Exception as e:
             self.logger.error(f"Görev listeleme hatası: {e}")
             print("KIZIL: Görevler listelenemedi.")
 
-    def _task_del(self, girdi):
+    def _task_del(self, girdi: str) -> None:
         parcalar = girdi.split(maxsplit=2)
         if len(parcalar) < 3:
             print("KIZIL: Örnek: görev sil <id>")
             return
         gid = parcalar[2].strip()
         try:
+            tasks = self.task_mgr.list_tasks()
+            saved = next((t for t in tasks if t["id"] == gid), None)
             ok = self.task_mgr.delete_task(gid)
             if ok:
-                self._last_action = {"type": "task_del", "id": gid}
+                self._action_history.append({"type": "task_del", "task": saved} if saved else {"type": "task_del", "id": gid})
             print(f"KIZIL: Görev #{gid} silindi." if ok else f"KIZIL: Görev #{gid} bulunamadı.")
         except (ValueError, TypeError):
             print(f"KIZIL: Geçersiz görev ID: {gid}")
@@ -434,7 +460,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             self.logger.error(f"Görev silme hatası: {e}")
             print("KIZIL: Görev silinirken hata oluştu.")
 
-    def _task_done(self, girdi):
+    def _task_done(self, girdi: str) -> None:
         parcalar = girdi.split(maxsplit=2)
         if len(parcalar) < 3:
             print("KIZIL: Örnek: görev tamam <id>")
@@ -443,21 +469,24 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         try:
             ok, mesaj = self.task_mgr.mark_done(gid)
             if ok and "tamamlandı" in mesaj:
-                self._last_action = {"type": "task_done", "id": gid}
+                self._action_history.append({"type": "task_done", "id": gid})
             print(f"KIZIL: {mesaj}")
             if ok and "tamamlandı" in mesaj:
-                tasks = self.task_mgr.list_tasks()
-                for t in tasks:
-                    if t.get("depends_on") == gid and not t.get("done"):
-                        print(f"  💡 '{t['desc']}' görevi [#{t['id']}] bu göreve bağlıydı. Tamamlamak ister misin?")
-                        break
+                self._suggest_next_task(gid)
         except (ValueError, TypeError):
             print(f"KIZIL: Geçersiz görev ID: {gid}")
         except Exception as e:
             self.logger.error(f"Görev tamamlama hatası: {e}")
             print("KIZIL: Görev tamamlanırken hata oluştu.")
 
-    def _task_chain(self, girdi):
+    def _suggest_next_task(self, completed_id: str) -> None:
+        tasks = self.task_mgr.list_tasks()
+        for t in tasks:
+            if t.get("depends_on") == completed_id and not t.get("done"):
+                print(f"  💡 '{t['desc']}' görevi [#{t['id']}] bu göreve bağlıydı. Tamamlamak ister misin?")
+                break
+
+    def _task_chain(self, girdi: str) -> None:
         parcalar = girdi.split()
         if len(parcalar) < 4:
             print("KIZIL: Örnek: görev zincirle <id1> <id2>")
@@ -473,57 +502,61 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             self.logger.error(f"Görev zincirleme hatası: {e}")
             print("KIZIL: Görev zincirleme sırasında hata oluştu.")
 
-    def _undo(self):
-        if not self._last_action:
+    def _undo(self) -> None:
+        if not self._action_history:
             print("KIZIL: Geri alınacak işlem yok.")
             return
-        action = self._last_action
+        action = self._action_history.pop()
         try:
             if action["type"] == "task_add":
                 ok = self.task_mgr.delete_task(action["id"])
                 print(f"KIZIL: Görev #{action['id']} geri alındı (silindi)." if ok else "KIZIL: Geri alma başarısız.")
             elif action["type"] == "task_del":
-                print("KIZIL: Görev silme geri alınamaz (veri kayboldu).")
-            elif action["type"] == "task_done":
-                # Tamamlanan görevi geri al (done=False yap)
-                tasks = self.task_mgr.list_tasks()
-                for t in tasks:
-                    if t["id"] == action["id"]:
-                        t["done"] = False
-                        self.task_mgr._save(tasks)
-                        print(f"KIZIL: Görev #{action['id']} tamamlandı işareti geri alındı.")
-                        break
+                if "task" in action and action["task"] is not None:
+                    self.task_mgr.add_raw_task(action["task"])
+                    print(f"KIZIL: Görev #{action['task']['id']} geri yüklendi.")
                 else:
-                    print("KIZIL: Görev bulunamadı, geri alınamadı.")
-            self._last_action = None
+                    print("KIZIL: Silinen görevin verisi bulunamadı, geri alınamadı.")
+            elif action["type"] == "task_done":
+                ok = self.task_mgr.unmark_done(action["id"])
+                print(f"KIZIL: Görev #{action['id']} tamamlandı işareti geri alındı." if ok else "KIZIL: Geri alma başarısız.")
         except Exception as e:
             print(f"KIZIL: Geri alma hatası: {e}")
 
-    def _show_status(self):
+    # ========================================================================
+    # DURUM VE KARA LİSTE
+    # ========================================================================
+
+    def _show_status(self) -> None:
         m = self.chat.get_metrics()
         blacklisted = self.chat.get_blacklisted_tools()
         panic = self.chat.is_panic_mode()
-        prompt = (
-            f"Asistan performans metrikleri:\n"
-            f"Toplam araç çağrısı: {m['toplam_arac_cagrisi']}\n"
-            f"Başarılı: {m['basarili_arac_cagrisi']}\n"
-            f"Başarısız: {m['basarisiz_arac_cagrisi']}\n"
-            f"Kırılan zincir: {m['kirilan_zincir']}\n"
-        )
+        toplam = m["toplam_arac_cagrisi"]
+        basarili = m["basarili_arac_cagrisi"]
+        basarisiz = m["basarisiz_arac_cagrisi"]
+        kirilan = m["kirilan_zincir"]
+        oran = (basarili / toplam * 100) if toplam > 0 else 0
+
+        print("KIZIL: Performans Metrikleri")
+        print(f"  Toplam araç çağrısı: {toplam}")
+        print(f"  Başarılı: {basarili} (%{oran:.1f})")
+        print(f"  Başarısız: {basarisiz}")
+        print(f"  Kırılan zincir: {kirilan}")
         if blacklisted:
-            prompt += f"Devre dışı bırakılan araçlar: {', '.join(blacklisted)}\n"
+            print(f"  Devre dışı araçlar: {', '.join(blacklisted)}")
         if panic:
-            prompt += "Uyarı: Sistem panik modunda! Araç kullanımı durduruldu.\n"
-        prompt += "\nBu metrikleri Türkçe, doğal bir dille özetle. Kısa ve net bir performans raporu ver."
+            print("  ⚠️  Sistem panik modunda!")
+        if toplam > 0:
+            if oran >= 90:
+                print("  Durum: Mükemmel ✅")
+            elif oran >= 70:
+                print("  Durum: İyi 🟡")
+            else:
+                print("  Durum: İyileştirme gerekli 🔴")
+        else:
+            print("  Durum: Henüz araç çağrısı yapılmamış.")
 
-        def istek():
-            resp = self.chat.yanit_ver(prompt)
-            print("KIZIL:", resp)
-            return resp
-
-        self._safe_llm(istek)
-
-    def _show_blacklist(self):
+    def _show_blacklist(self) -> None:
         blacklisted = self.chat.get_blacklisted_tools()
         panic = self.chat.is_panic_mode()
         if panic:
@@ -534,13 +567,62 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("KIZIL: Şu anda kara listede araç yok.")
         print("  'karaliste temizle' yazarak sıfırlayabilirsiniz.")
 
-    def _clear_blacklist(self):
+    def _clear_blacklist(self) -> None:
         self.chat._blacklisted_tools.clear()
         self.chat._tool_fail_counts.clear()
         self.chat.reset_panic()
         print("KIZIL: Kara liste temizlendi, panik modu sıfırlandı. Tüm araçlar tekrar kullanılabilir.")
 
-    def stop(self):
+    # ========================================================================
+    # OTURUM, LOG VE DIŞA AKTARMA
+    # ========================================================================
+
+    def _show_errors(self) -> None:
+        log_path = os.path.join(self.config.STORAGE_DIR, self.config.LOG_FILE)
+        if not os.path.exists(log_path):
+            print("KIZIL: Henüz log dosyası oluşmamış.")
+            return
+        with open(log_path, "r", encoding="utf-8") as f:
+            lines = [line for line in f.readlines() if "[ERROR]" in line]
+        if not lines:
+            print("KIZIL: Hiç hata kaydı bulunamadı.")
+            return
+        print("KIZIL: Son 10 hata kaydı:")
+        for line in lines[-10:]:
+            print(f"  {line.strip()}")
+
+    def _show_sessions(self) -> None:
+        sessions = self.session.list_sessions()
+        if not sessions:
+            print("KIZIL: Henüz oturum kaydı yok.")
+            return
+        print("KIZIL: Geçmiş oturumlar:")
+        for s in sessions:
+            durum = "✅" if s.get("end") else "🔄"
+            print(f"  {durum} {s['id']} | {s['start']} → {s.get('end', 'devam ediyor')}")
+
+    def _export_conversation(self) -> None:
+        src = self.memory.conversation_file
+        if not os.path.exists(src):
+            print("KIZIL: Dışa aktarılacak konuşma günlüğü bulunamadı.")
+            return
+        tarih = datetime.now().strftime("%Y%m%d_%H%M%S")
+        dst = os.path.join(self.config.STORAGE_DIR, f"export_{tarih}.txt")
+        with open(src, "r", encoding="utf-8") as f_in:
+            with open(dst, "w", encoding="utf-8") as f_out:
+                f_out.write("KIZIL Asistan Konuşma Dışa Aktarımı\n")
+                f_out.write(f"Tarih: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f_out.write("-" * 40 + "\n")
+                f_out.write(f_in.read())
+        print(f"KIZIL: Konuşma günlüğü dışa aktarıldı: {dst}")
+
+    # ========================================================================
+    # KAPANIŞ
+    # ========================================================================
+
+    def stop(self) -> None:
+        if not self.running:
+            return
         self.chat.save_metrics()
         self.session.end_session()
         self.running = False

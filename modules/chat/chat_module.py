@@ -1,4 +1,4 @@
-"""Sohbet modülü – LLM ile iletişim ve araç çağrısı entegrasyonu."""
+"""Sohbet modülü – LLM ile iletişim, araç çağrısı ve davranış katmanı."""
 import re
 import json
 import os
@@ -11,7 +11,7 @@ MAX_TOOL_RESULT_LEN = 4000
 MAX_MESSAGES = 20
 MAX_TOTAL_CHARS = 8000
 TOOL_BLACKLIST_THRESHOLD = 5
-PANIC_THRESHOLD = 3  # üst üste zincir kırılması → panic mode
+PANIC_THRESHOLD = 3
 
 WHITESPACE_RE = re.compile(r'\s+')
 
@@ -24,6 +24,31 @@ TOOL_RULES = """KURAL:
 6. Eğer bir araç sonucu çok uzunsa, sadece önemli kısımları özetleyerek yanıt ver. Detay gerekiyorsa kullanıcıya sor.
 7. HER ZAMAN, istisnasız, araç sonucunu analiz et ve sadece TÜRKÇE yanıt ver.
 8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir."""
+
+TOOL_TRIGGERS = {
+    "saat": "zaman",
+    "tarih": "zaman",
+    "bugün": "zaman",
+    "dosya": None,
+    "ara": "web_ara",
+    "arama": "web_ara",
+    "hava": "hava_durumu",
+    "sıcaklık": "hava_durumu",
+    "görev": None,
+    "oku": "dosya_oku",
+    "listele": "dosya_listele",
+    "sil": "dosya_sil",
+    "boyut": "dosya_boyutu",
+    "web": "web_oku",
+    "sistem": "sistem_bilgisi",
+    "cpu": "sistem_bilgisi",
+    "ram": "sistem_bilgisi",
+    "disk": "sistem_bilgisi",
+    "klasör": "klasor_olustur",
+    "taşı": "dosya_tasi",
+    "kopyala": "dosya_kopyala",
+    "uygulama": "uygulama_baslat",
+}
 
 
 def _normalize_text(text: str) -> str:
@@ -45,7 +70,6 @@ class ChatModule:
         self._metrics_file: str = ""
         self._tool_fail_counts: dict[str, int] = {}
         self._blacklisted_tools: set[str] = set()
-        # Panic mode: üst üste zincir kırılmalarında araçlar devre dışı
         self._panic_mode = False
         self._panic_count = 0
 
@@ -107,6 +131,40 @@ class ChatModule:
         except Exception as e:
             self._log("error", f"Metrikler yüklenemedi: {e}")
 
+    # ========================================================================
+    # DAVRANIŞ KATMANI
+    # ========================================================================
+
+    def _should_use_tool(self, msg: str) -> bool:
+        msg_lower = msg.lower()
+        for trigger in TOOL_TRIGGERS:
+            if trigger in msg_lower:
+                return True
+        return False
+
+    def _should_ask_user(self, msg: str) -> bool:
+        msg_lower = msg.lower()
+        vague_patterns = ["ne yapabilirsin", "neler biliyorsun", "yardım et", "nasıl"]
+        for pattern in vague_patterns:
+            if pattern in msg_lower:
+                return True
+        if len(msg.split()) <= 1 and not self._should_use_tool(msg):
+            return True
+        return False
+
+    def _decide_action(self, msg: str) -> str:
+        if self._panic_mode:
+            return "chat"
+        if self._should_use_tool(msg):
+            return "tool"
+        if self._should_ask_user(msg):
+            return "ask"
+        return "chat"
+
+    # ========================================================================
+    # TOOL PROMPT VE GÜVENLİK
+    # ========================================================================
+
     def _tool_prompt(self) -> str:
         if not self.tool_manager:
             return ""
@@ -145,6 +203,8 @@ class ChatModule:
         return sum(len(m.get("content", "")) for m in messages)
 
     def _prune_messages(self, messages: list) -> list:
+        if not messages:
+            return messages
         if len(messages) <= MAX_MESSAGES and self._total_chars(messages) <= MAX_TOTAL_CHARS:
             return messages
         system_msg = messages[0] if messages[0]["role"] == "system" else None
@@ -161,8 +221,17 @@ class ChatModule:
                 break
         return [system_msg] + budanmis if system_msg else budanmis
 
+    # ========================================================================
+    # ANA AKIŞ
+    # ========================================================================
+
     def yanit_ver(self, msg: str, ctx=None) -> str:
         msg = self._sanitize_input(msg)
+
+        action = self._decide_action(msg)
+        if action == "ask":
+            return "Size daha iyi yardımcı olabilmem için ne yapmak istediğinizi biraz daha detaylandırabilir misiniz?"
+
         messages = []
 
         if isinstance(ctx, dict):
@@ -180,8 +249,10 @@ class ChatModule:
         if system_parts:
             messages.append({"role": "system", "content": "\n".join(system_parts)})
 
-        if safe_ctx.get("history"):
-            messages.extend(safe_ctx["history"])
+        # history tip güvenliği: sadece list ise extend et
+        history = safe_ctx.get("history")
+        if isinstance(history, list):
+            messages.extend(history)
 
         messages.append({"role": "user", "content": msg})
 
@@ -228,36 +299,44 @@ class ChatModule:
                 self._inc_tool_fail(current_tool)
                 if current_tool == last_tool:
                     fail_count += 1
-                    if fail_count >= TOOL_FAIL_LIMIT:
-                        self.metrics["kirilan_zincir"] += 1
-                        self._panic_count += 1
-                        if self._panic_count >= PANIC_THRESHOLD:
-                            self._panic_mode = True
-                            self._log("critical", f"Panic mode aktif! {PANIC_THRESHOLD} zincir kırıldı.")
-                            return "⚠️ KIZIL panik moduna geçti. Araç kullanımı durduruldu. Sorun giderilince 'karaliste temizle' yazıp panik modunu sıfırlayabilirsiniz."
-                        self._log("warning", f"'{current_tool}' aracı {fail_count} kez başarısız oldu, zincir kırılıyor.")
-                        messages.append({"role": "assistant", "content": response})
-                        messages.append({
-                            "role": "user",
-                            "content": f"[SİSTEM] '{current_tool}' aracı {fail_count} kez başarısız oldu. Araç kullanmayı bırak, elindeki bilgiyle Türkçe yanıt ver."
-                        })
-                        response = self.router.chat(messages)
-                        break
                 else:
                     fail_count = 1
                     last_tool = current_tool
+
+                if fail_count >= TOOL_FAIL_LIMIT:
+                    self.metrics["kirilan_zincir"] += 1
+                    self._panic_count += 1
+                    if self._panic_count >= PANIC_THRESHOLD:
+                        self._panic_mode = True
+                        self._log("critical", f"Panic mode aktif! {PANIC_THRESHOLD} zincir kırıldı.")
+                        return "⚠️ KIZIL panik moduna geçti. Araç kullanımı durduruldu. Sorun giderilince 'karaliste temizle' yazıp panik modunu sıfırlayabilirsiniz."
+                    self._log("warning", f"'{current_tool}' aracı {fail_count} kez başarısız oldu, zincir kırılıyor.")
+                    messages.append({"role": "assistant", "content": response})
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SİSTEM] '{current_tool}' aracı {fail_count} kez başarısız oldu. Araç kullanmayı bırak, elindeki bilgiyle Türkçe yanıt ver."
+                    })
+                    response = self.router.chat(messages)
+                    break
+                # Zincir kırılmadıysa LLM'e hatayı göster ve dene
+                messages.append({"role": "assistant", "content": response})
+                messages.append({
+                    "role": "user",
+                    "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
+                })
+                response = self.router.chat(messages)
+                call_count += 1
             else:
                 self.metrics["basarili_arac_cagrisi"] += 1
                 fail_count = 0
                 last_tool = ""
-
-            messages.append({"role": "assistant", "content": response})
-            messages.append({
-                "role": "user",
-                "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
-            })
-            response = self.router.chat(messages)
-            call_count += 1
+                messages.append({"role": "assistant", "content": response})
+                messages.append({
+                    "role": "user",
+                    "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
+                })
+                response = self.router.chat(messages)
+                call_count += 1
 
             if len(messages) > MAX_MESSAGES or self._total_chars(messages) > MAX_TOTAL_CHARS:
                 messages = self._prune_messages(messages)
@@ -275,9 +354,10 @@ class ChatModule:
             self._log("warning", f"'{tool_name}' aracı {count} kez başarısız oldu, otomatik devre dışı bırakıldı.")
 
     def _llm_yanit(self, prompt: str) -> str:
-        saved_tm = self.tool_manager
-        self.tool_manager = None
+        """Saf LLM yanıtı alır. Araç zincirine veya davranış katmanına takılmaz."""
         try:
-            return self.yanit_ver(msg=prompt)
-        finally:
-            self.tool_manager = saved_tm
+            response = self.router.chat([{"role": "user", "content": prompt}])
+            return response or ""
+        except Exception as e:
+            self._log("error", f"Saf LLM çağrısı başarısız: {e}")
+            return ""

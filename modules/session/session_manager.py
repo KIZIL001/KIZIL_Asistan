@@ -1,54 +1,68 @@
+"""Oturum yönetimi – thread-safe, atomik yazma, JSON toleranslı."""
 import json
 import os
 import uuid
+import tempfile
+import threading
 from datetime import datetime
 
 
 class SessionManager:
-    def __init__(self, storage_dir="storage"):
+    def __init__(self, storage_dir: str):
         self.storage_dir = storage_dir
-        self.sessions_dir = os.path.join(storage_dir, "sessions")
-        self.sessions_file = os.path.join(self.sessions_dir, "sessions.json")
-        os.makedirs(self.sessions_dir, exist_ok=True)
-        self._ensure_file()
-        self.current_id = None
-
-    def _ensure_file(self):
-        if not os.path.exists(self.sessions_file):
-            with open(self.sessions_file, "w", encoding="utf-8") as f:
-                json.dump([], f, indent=2)
+        self.file_path = os.path.join(storage_dir, "sessions", "sessions.json")
+        self._lock = threading.RLock()
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
 
     def _load(self) -> list:
-        with open(self.sessions_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError, FileNotFoundError):
+            return []
 
-    def _save(self, sessions: list):
-        with open(self.sessions_file, "w", encoding="utf-8") as f:
-            json.dump(sessions, f, indent=2, ensure_ascii=False)
+    def _save(self, sessions: list) -> None:
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(self.file_path))
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(sessions, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, self.file_path)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
 
     def start_session(self) -> str:
-        sid = datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid.uuid4())[:8]
-        session = {
-            "id": sid,
-            "start": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "end": None
-        }
-        sessions = self._load()
-        sessions.append(session)
-        self._save(sessions)
-        self.current_id = sid
-        return sid
+        with self._lock:
+            sessions = self._load()
+            session = {
+                "id": str(uuid.uuid4())[:8],
+                "start": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "end": None,
+            }
+            sessions.append(session)
+            self._save(sessions)
+            return session["id"]
 
-    def end_session(self):
-        if not self.current_id:
-            return
-        sessions = self._load()
-        for s in sessions:
-            if s["id"] == self.current_id:
-                s["end"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                break
-        self._save(sessions)
-        self.current_id = None
+    def end_session(self, session_id: str | None = None) -> None:
+        with self._lock:
+            sessions = self._load()
+            if session_id:
+                for s in sessions:
+                    if s.get("id") == session_id and s.get("end") is None:
+                        s["end"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        self._save(sessions)
+                        return
+                # ID verildi ama bulunamadı → alt bloğa düşme
+                return
+
+            # ID verilmezse son açık oturumu kapat
+            for s in reversed(sessions):
+                if s.get("end") is None:
+                    s["end"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    self._save(sessions)
+                    return
 
     def list_sessions(self) -> list:
-        return self._load()
+        with self._lock:
+            return self._load()
