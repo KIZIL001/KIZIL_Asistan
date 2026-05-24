@@ -1,0 +1,21 @@
+Özet Tarihi: 2026-05-23 20:10:53
+Kaynak: storage/conversations/gunluk.txt
+------------------------------
+Bir asistan modu oluşturma adaylar, GitHub'ta yöneticinin daha kolay bir bağlayıcı hareketine ve projelerini sürecinde kullanmak isteyenleri sağlamaya çalışması gerekir. Bu sayede ki sorunumuzda, komutlar uygulandıktan sonra GitHub'ta daha kolay bir özellik oluşturmayı ve projeye bağlama isterler. Ama bazen sorun yaratmak için kod edilerek bu hata ayarla ilgili ad alması gerekirsiniz:
+
+1. Git'teki dosyalara erişim listesini önce daha sonra `git checkout master` oluşturmaktık ve asistan modu yapmanızda ki bu hata ayarla ilgili ad değerine göre bağlantıya benzer bir özellik oluşturan git commit'e ekleyin:
+
+```bash
+git checkout master
+python orchestrator.py # Bu, asistan bölümündeki ortamda kod yazma için kullanıyoruz ve bu özellik bağlanmak isterli bir ad dersi oluşturmaktadır
+git commit -aM "Hata ayarların daha kolaydır" # Git'te soru gizli başlatma yaparak, hata ile ilgili özelliğini söyleyecek adatlanması gerekirse
+git push herhangi bir önceden oluşturulmuş durumun ardındaki yerine kullanmak emin olun. Daha sonra Git'te geriye döndürülmesi isterli ve gerekirse
+```
+2. Sorunu sileceğim, GitHub tarafsız oluşturma için bu projeye bağlanmasın mümkün olduğunca açıklarında hala daha sonra Git'te geriye döndürülmesini isterli olmayan git push denemelerine eklenecektir. Sorusunda, bu projeye başlatma ya da GitHub 'ta yazmaya gerekmez:
+
+```bash
+git commit -am "Hata ayarların daha kolaydır" # Git'te soru gizli başlatma yaparak, hata ile ilgili özellik oluşturmaktadır. Yazmaya benzer bir adatlanması isterlidir
+git push herhangi bir önceden oluşturulmuş durumun ardındaki yerine kullanman gerekirse # Git'te geriye döndürülmesi isterli olmayan git push denemelerin bağlanmasın
+```
+
+Bu adamlar, bu projeye daha kolay bir şekilde yardımcular yapmanlaştık ve GitHub'ta daha kullanabileceksiniz.

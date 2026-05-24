@@ -4,7 +4,7 @@
   "MEMORY_DIR": "memory",
   "LOG_FILE": "kizil.log",
   "LOG_LEVEL": "DEBUG",
-  "LLM_MODEL": "phi3:mini",
+  "LLM_MODEL": "llama3.2:3b",
   "SUMMARY_MAX_LINES": 50,
   "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz."
 }

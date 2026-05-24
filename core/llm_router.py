@@ -1,15 +1,11 @@
-import ollama
+"""Ollama LLM yönlendirici."""
+import ollama  # type: ignore
+
 
 class LLMRouter:
-    """Farklı dil modellerine yönlendirme yapar. Şimdilik sadece Ollama."""
-
-    def __init__(self, model="phi3:mini"):
+    def __init__(self, model: str) -> None:
         self.model = model
 
-    def chat(self, messages):
-        """Modelle sohbet et, yanıt metnini döndür."""
-        try:
-            response = ollama.chat(model=self.model, messages=messages)
-            return response["message"]["content"].strip()
-        except Exception as e:
-            raise RuntimeError(f"LLM çağrısı başarısız: {e}")
+    def chat(self, messages: list) -> str:
+        response = ollama.chat(model=self.model, messages=messages)
+        return response.get("message", {}).get("content", "")
