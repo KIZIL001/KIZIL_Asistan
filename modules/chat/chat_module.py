@@ -25,7 +25,8 @@ TOOL_RULES = """KURAL:
 7. HER ZAMAN, istisnasız, araç sonucunu analiz et ve sadece TÜRKÇE yanıt ver.
 8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir.
 9. Karmaşık görevlerde sistem sana bir [İÇ PLAN] verebilir, bu plana uyarak araçları sırayla çağır.
-10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir."""
+10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir.
+11. Çok adımlı karmaşık hedefleri görevlere böl, zincirle, [İÇ PLAN] ile adım adım uygula, tamamlanınca kullanıcıya BAŞKA BİR ARAÇ ÇAĞIRMADAN kısa bir özet rapor sun."""
 
 
 def _normalize_text(text: str) -> str:
@@ -189,7 +190,31 @@ class ChatModule:
             toplam += boyut
             if len(budanmis) >= MAX_MESSAGES:
                 break
-        return [system_msg] + budanmis if system_msg else budanmis
+
+        # Nihai listeyi oluştur
+        sonuc = [system_msg] + budanmis if system_msg else budanmis
+
+        # Mükerrer kontrolünü ham messages yerine nihai sonuc listesinde ara
+        uyari_var = any(
+            "[BAĞLAM BUDANDI]" in m.get("content", "")
+            for m in sonuc
+        )
+
+        if not uyari_var:
+            uyari = {
+                "role": "system",
+                "content": (
+                    "[BAĞLAM BUDANDI] Konuşma geçmişi sınırı aşıldı. "
+                    "Eksik bilgi için hafıza araçlarını kullan."
+                )
+            }
+            # Uyarıyı her zaman ana sistem promptunun hemen arkasına güvenlikle enjekte et
+            if system_msg:
+                sonuc.insert(1, uyari)
+            else:
+                sonuc.insert(0, uyari)
+
+        return sonuc
 
     # ========================================================================
     # ANA AKIŞ

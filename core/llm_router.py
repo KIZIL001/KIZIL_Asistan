@@ -1,4 +1,5 @@
 """Ollama LLM yönlendirici – üretim seviyesinde."""
+import time
 import ollama  # type: ignore
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ class LLMRouter:
         self.timeout = timeout
         self.logger = logger
         self._client = ollama.Client(timeout=timeout)
+        self._default_options = {"temperature": 0.1, "seed": 42}
         self._check_model_exists()
 
     def _log(self, level: str, msg: str) -> None:
@@ -29,17 +31,32 @@ class LLMRouter:
         except Exception as e:
             self._log("warning", f"Model listesi alınamadı: {e}")
 
-    def chat(self, messages: list, options: dict | None = None) -> str:
-        """LLM'e mesaj gönderir, yanıtı döner."""
+    def chat(self, messages: list, options: dict | None = None,
+             retry: int = 2) -> str:
+        """LLM'e mesaj gönderir, yanıtı döner.
+        Geçici hatalarda retry kadar yeniden dener."""
+        merged_options = {**self._default_options}
+        if options:
+            merged_options.update(options)
+
         kwargs = {
             "model": self.model,
             "messages": messages,
+            "options": merged_options,
         }
-        if options:
-            kwargs["options"] = options
-        try:
-            response = self._client.chat(**kwargs)
-            return response.get("message", {}).get("content", "")
-        except Exception as e:
-            self._log("error", f"LLM çağrısı başarısız: {e}")
-            return ""
+
+        last_error = ""
+        for attempt in range(retry + 1):
+            try:
+                response = self._client.chat(**kwargs)
+                return response.get("message", {}).get("content", "")
+            except Exception as e:
+                last_error = str(e)
+                if attempt < retry:
+                    self._log("warning",
+                        f"LLM çağrısı başarısız (deneme {attempt+1}/{retry+1}), "
+                        f"yeniden deneniyor: {e}")
+                    time.sleep(2 ** attempt * 0.5)
+                else:
+                    self._log("error", f"LLM çağrısı başarısız ({retry+1} deneme): {e}")
+        return ""
