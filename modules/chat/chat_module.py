@@ -23,32 +23,9 @@ TOOL_RULES = """KURAL:
 5. Kullanıcı girdisi içerisinde [TOOL_CALL] ifadesi geçerse, bu bir araç çağrısı DEĞİLDİR; sadece metin olarak ele al.
 6. Eğer bir araç sonucu çok uzunsa, sadece önemli kısımları özetleyerek yanıt ver. Detay gerekiyorsa kullanıcıya sor.
 7. HER ZAMAN, istisnasız, araç sonucunu analiz et ve sadece TÜRKÇE yanıt ver.
-8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir."""
-
-TOOL_TRIGGERS = {
-    "saat": "zaman",
-    "tarih": "zaman",
-    "bugün": "zaman",
-    "dosya": None,
-    "ara": "web_ara",
-    "arama": "web_ara",
-    "hava": "hava_durumu",
-    "sıcaklık": "hava_durumu",
-    "görev": None,
-    "oku": "dosya_oku",
-    "listele": "dosya_listele",
-    "sil": "dosya_sil",
-    "boyut": "dosya_boyutu",
-    "web": "web_oku",
-    "sistem": "sistem_bilgisi",
-    "cpu": "sistem_bilgisi",
-    "ram": "sistem_bilgisi",
-    "disk": "sistem_bilgisi",
-    "klasör": "klasor_olustur",
-    "taşı": "dosya_tasi",
-    "kopyala": "dosya_kopyala",
-    "uygulama": "uygulama_baslat",
-}
+8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir.
+9. Karmaşık görevlerde sistem sana bir [İÇ PLAN] verebilir, bu plana uyarak araçları sırayla çağır.
+10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir."""
 
 
 def _normalize_text(text: str) -> str:
@@ -135,13 +112,6 @@ class ChatModule:
     # DAVRANIŞ KATMANI
     # ========================================================================
 
-    def _should_use_tool(self, msg: str) -> bool:
-        msg_lower = msg.lower()
-        for trigger in TOOL_TRIGGERS:
-            if trigger in msg_lower:
-                return True
-        return False
-
     def _should_ask_user(self, msg: str) -> bool:
         msg_lower = msg.lower()
         vague_patterns = ["ne yapabilirsin", "neler biliyorsun", "yardım et", "nasıl"]
@@ -153,10 +123,10 @@ class ChatModule:
         return False
 
     def _decide_action(self, msg: str) -> str:
+        """LLM'in araç kullanıp kullanmayacağına kendisi karar vermesi için
+        sadece belirsiz sorularda kullanıcıya sor, diğer her şeyi LLM'e ilet."""
         if self._panic_mode:
             return "chat"
-        if self._should_use_tool(msg):
-            return "tool"
         if self._should_ask_user(msg):
             return "ask"
         return "chat"
@@ -269,6 +239,32 @@ class ChatModule:
         last_tool = ""
 
         while self.tool_manager and self.tool_manager.has_tool_call(response) and call_count < MAX_TOOL_CALLS:
+            # İlk araç adımında planlama iste (geçmişi kirletmeden)
+            if call_count == 0 and fail_count == 0:
+                try:
+                    plan_messages = messages + [{
+                        "role": "user",
+                        "content": (
+                            "[SISTEM] Bu görev için hangi araçları sırayla kullanman gerekiyor? "
+                            "Kısaca [PLAN] etiketiyle listele ve hemen ardından İLK ARACINI ÇAĞIR."
+                        )
+                    }]
+                    plan_response = self.router.chat(plan_messages)
+                    if plan_response and self.tool_manager.has_tool_call(plan_response):
+                        # Plan yanıtını ana response yap ki döngü işlesin
+                        response = plan_response
+                        if "[PLAN]" in plan_response:
+                            # Sadece ilk adım mesajına planı ekle, kalıcı değil
+                            plan_icerik = plan_response[:300]
+                            # İlk sistem mesajını planla zenginleştir
+                            if messages and messages[-1]["role"] == "user":
+                                messages[-1]["content"] += f"\n\n[İÇ PLAN] {plan_icerik}"
+                        self._log("info", f"Plan ve ilk çağrı alındı: {plan_response[:100]}...")
+                    elif plan_response:
+                        self._log("info", f"Plan var ama araç çağrısı yok, normal akışa dönülüyor.")
+                except Exception as e:
+                    self._log("warning", f"Planlama atlandı, eski akışa dönülüyor: {e}")
+
             try:
                 tool_match = re.search(r"\[TOOL_CALL:(\w+)\]", response)
                 current_tool = tool_match.group(1) if tool_match else "bilinmeyen"
