@@ -17,12 +17,14 @@ class ToolManager:
         description: str,
         parameters: dict[str, str],
         func: Callable[..., str],
+        timeout: Optional[int] = None,
     ) -> None:
-        """Yeni bir araç kaydeder."""
+        """Yeni bir araç kaydeder. timeout (saniye) opsiyonel, ileride kullanılacak."""
         self.tools[name] = {
             "description": description,
             "parameters": parameters,
             "func": func,
+            "timeout": timeout,  # Pasif: şimdilik sadece saklanır
         }
 
     def get_tool_list(self) -> str:
