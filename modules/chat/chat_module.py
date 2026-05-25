@@ -352,10 +352,16 @@ class ChatModule:
                     break
                 # Zincir kırılmadıysa LLM'e hatayı göster ve dene
                 messages.append({"role": "assistant", "content": response})
-                messages.append({
-                    "role": "user",
-                    "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
-                })
+                if fail_count == 1:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SİSTEM] Araç '{current_tool}' başarısız oldu: {tool_result}\nAynı aracı tekrar deneme. Farklı bir araç kullan veya kullanıcıya durumu bildir."
+                    })
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
+                    })
                 response = self.router.chat(messages)
                 for n in re.findall(r'\[NOT:\s*(.*?)\s*\]', response, re.DOTALL):
                     n = n.strip()
@@ -368,10 +374,16 @@ class ChatModule:
                 fail_count = 0
                 last_tool = ""
                 messages.append({"role": "assistant", "content": response})
-                messages.append({
-                    "role": "user",
-                    "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
-                })
+                if fail_count == 1:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SİSTEM] Araç '{current_tool}' başarısız oldu: {tool_result}\nAynı aracı tekrar deneme. Farklı bir araç kullan veya kullanıcıya durumu bildir."
+                    })
+                else:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
+                    })
                 response = self.router.chat(messages)
                 call_count += 1
 
