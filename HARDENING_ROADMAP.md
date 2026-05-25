@@ -23,7 +23,7 @@
 |---|----------|-------|
 | 1 | Plugin izin kaçakları | ✅ Tamamlandı |
 | 2 | Path bypass (sandbox aşımı) | ✅ Tamamlandı |
-| 3 | Malformed input (JSON injection vb.) | ⏳ Bekliyor |
+| 3 | Malformed input (JSON injection vb.) | ✅ Tamamlandı |
 | 4 | Memory corruption (vektör/delta bozulması) | ⏳ Bekliyor |
 | 5 | Infinite task chain / fake workflow completion | ⏳ Bekliyor |
 
