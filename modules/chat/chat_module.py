@@ -1,6 +1,7 @@
 """Sohbet modülü – LLM ile iletişim, araç çağrısı ve davranış katmanı."""
 import re
 import json
+from datetime import datetime, timezone
 import os
 from core.llm_router import LLMRouter
 from modules.tools.tool_manager import ToolManager
@@ -46,13 +47,18 @@ class ChatModule:
             "basarili_arac_cagrisi": 0,
             "basarisiz_arac_cagrisi": 0,
             "kirilan_zincir": 0,
+            "toplam_llm_cagrisi": 0,
+            "session_suresi_sn": 0,
         }
         self._metrics_file: str = ""
         self._tool_fail_counts: dict[str, int] = {}
+        self._tool_last_fail_time: dict[str, str] = {}
         self._blacklisted_tools: set[str] = set()
         self._panic_mode = False
         self._panic_count = 0
         self.scratchpad: list[str] = []
+        self._session_start_time: str = ""
+        self._session_active: bool = False
 
     def set_tool_manager(self, tm: ToolManager) -> None:
         self.tool_manager = tm
@@ -76,6 +82,31 @@ class ChatModule:
     def get_metrics(self) -> dict:
         return dict(self.metrics)
 
+    def get_session_summary(self) -> dict:
+        """Oturum özeti: metrikler + başlangıç/süre bilgisi (H4-1)."""
+        return {
+            "session_start": self._session_start_time or "bilinmiyor",
+            "session_duration_s": self.metrics.get("session_suresi_sn", 0),
+            "toplam_arac_cagrisi": self.metrics["toplam_arac_cagrisi"],
+            "basarili": self.metrics["basarili_arac_cagrisi"],
+            "basarisiz": self.metrics["basarisiz_arac_cagrisi"],
+            "kirilan_zincir": self.metrics["kirilan_zincir"],
+            "toplam_llm_cagrisi": self.metrics["toplam_llm_cagrisi"],
+            "panic_mode": self._panic_mode,
+        }
+
+    def get_failure_heatmap(self) -> list[dict]:
+        """En sık hata veren araçların sıralı listesi (H4-2)."""
+        items = []
+        for tool, count in self._tool_fail_counts.items():
+            items.append({
+                "tool": tool,
+                "fail_count": count,
+                "last_fail": self._tool_last_fail_time.get(tool, "bilinmiyor"),
+            })
+        items.sort(key=lambda x: x["fail_count"], reverse=True)
+        return items
+
     def get_blacklisted_tools(self) -> list:
         return sorted(self._blacklisted_tools)
 
@@ -86,18 +117,25 @@ class ChatModule:
         self._panic_mode = False
         self._panic_count = 0
         self.scratchpad: list[str] = []
+        self._session_start_time: str = ""
+        self._session_active: bool = False
 
     def reset_metrics(self) -> None:
         for key in self.metrics:
             self.metrics[key] = 0
+        self._tool_fail_counts.clear()
+        self._tool_last_fail_time.clear()
 
     def save_metrics(self) -> None:
         if not self._metrics_file:
             return
         try:
             os.makedirs(os.path.dirname(self._metrics_file), exist_ok=True)
+            data = dict(self.metrics)
+            data["_tool_fail_counts"] = dict(self._tool_fail_counts)
+            data["_tool_last_fail_time"] = dict(self._tool_last_fail_time)
             with open(self._metrics_file, "w", encoding="utf-8") as f:
-                json.dump(self.metrics, f, indent=2)
+                json.dump(data, f, indent=2)
         except Exception as e:
             self._log("error", f"Metrikler kaydedilemedi: {e}")
 
@@ -110,6 +148,10 @@ class ChatModule:
             for key in self.metrics:
                 if key in saved:
                     self.metrics[key] = saved[key]
+            if "_tool_fail_counts" in saved and isinstance(saved["_tool_fail_counts"], dict):
+                self._tool_fail_counts = saved["_tool_fail_counts"]
+            if "_tool_last_fail_time" in saved and isinstance(saved["_tool_last_fail_time"], dict):
+                self._tool_last_fail_time = saved["_tool_last_fail_time"]
         except Exception as e:
             self._log("error", f"Metrikler yüklenemedi: {e}")
 
@@ -225,6 +267,10 @@ class ChatModule:
     # ========================================================================
 
     def yanit_ver(self, msg: str, ctx=None) -> str:
+        if not self._session_active:
+            self._session_start_time = datetime.now(timezone.utc).isoformat()
+            self._session_active = True
+        self.metrics["toplam_llm_cagrisi"] += 1
         msg = self._sanitize_input(msg)
 
         action = self._decide_action(msg)
@@ -409,6 +455,12 @@ class ChatModule:
             if len(messages) > MAX_MESSAGES or self._total_chars(messages) > MAX_TOTAL_CHARS:
                 messages = self._prune_messages(messages)
 
+        if self._session_active and self._session_start_time:
+            try:
+                start = datetime.fromisoformat(self._session_start_time)
+                self.metrics["session_suresi_sn"] = int((datetime.now(timezone.utc) - start).total_seconds())
+            except Exception:
+                pass
         self.save_metrics()
         return self._sanitize_output(response)
 
@@ -417,6 +469,7 @@ class ChatModule:
             return
         count = self._tool_fail_counts.get(tool_name, 0) + 1
         self._tool_fail_counts[tool_name] = count
+        self._tool_last_fail_time[tool_name] = datetime.now(timezone.utc).isoformat()
         if count >= TOOL_BLACKLIST_THRESHOLD and tool_name not in self._blacklisted_tools:
             self._blacklisted_tools.add(tool_name)
             self._log("warning", f"'{tool_name}' aracı {count} kez başarısız oldu, otomatik devre dışı bırakıldı.")
