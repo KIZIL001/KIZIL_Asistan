@@ -1,3 +1,4 @@
+from core.determinism_guard import DeterminismGuard
 """Ollama LLM yönlendirici – üretim seviyesinde."""
 import time
 import ollama  # type: ignore
@@ -54,7 +55,9 @@ class LLMRouter:
                 response = self._client.chat(**kwargs)
                 content = response.get("message", {}).get("content", "")
                 if self._uncertainty_enabled():
-                    return apply_filter(content)
+                    DeterminismGuard().check(messages, self.model, content)
+                return apply_filter(content)
+                DeterminismGuard().check(messages, self.model, content)
                 return content
             except Exception as e:
                 last_error = str(e)

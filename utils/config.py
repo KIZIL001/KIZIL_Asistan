@@ -48,6 +48,7 @@ class Config:
             "ENABLE_GOLDEN_SESSION_RECORDING": False,
             "ENABLE_FAILURE_CORPUS": True,
             "ENABLE_RUNTIME_DIAGNOSTICS": False,
+            "ENABLE_DETERMINISM_GUARD": False,
         }
 
     def __getattr__(self, name):
