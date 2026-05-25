@@ -25,7 +25,7 @@
 | 2 | Path bypass (sandbox aşımı) | ✅ Tamamlandı |
 | 3 | Malformed input (JSON injection vb.) | ✅ Tamamlandı |
 | 4 | Memory corruption (vektör/delta bozulması) | ✅ Tamamlandı |
-| 5 | Infinite task chain / fake workflow completion | ⏳ Bekliyor |
+| 5 | Infinite task chain / fake workflow completion | ✅ Tamamlandı |
 
 ---
 
