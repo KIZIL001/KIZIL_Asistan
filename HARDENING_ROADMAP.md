@@ -44,10 +44,10 @@
 
 | # | Zayıflık | Durum |
 |---|----------|-------|
-| 1 | Runtime telemetry (araç istatistikleri) | ⏳ Bekliyor |
-| 2 | Failure heatmap (hata kümelenme analizi) | ⏳ Bekliyor |
-| 3 | Session analytics (kullanım örüntüleri) | ⏳ Bekliyor |
-| 4 | Determinizm skoru (tekrar edilebilirlik) | ⏳ Bekliyor |
+| 1 | Runtime telemetry | ✅ Tamamlandı |
+| 2 | Failure heatmap | ✅ Tamamlandı |
+| 3 | Session analytics | 🔒 Ertelendi – ayrı modül gerektiriyor |
+| 4 | Determinizm skoru | 🔒 Ertelendi – test altyapısı gerektiriyor |
 
 ---
 
