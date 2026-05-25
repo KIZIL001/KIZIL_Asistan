@@ -107,6 +107,35 @@ class ChatModule:
         items.sort(key=lambda x: x["fail_count"], reverse=True)
         return items
 
+    def get_session_analytics(self, max_sessions: int = 100) -> dict:
+        """Geçmiş oturumların temel analitiğini döner (H4-3)."""
+        session_file = self._metrics_file.replace(".json", "_sessions.jsonl") if self._metrics_file else ""
+        if not session_file or not os.path.exists(session_file):
+            return {"oturum_sayisi": 0, "ortalama_sure_sn": 0, "en_cok_kullanilan_arac": "bilinmiyor"}
+        try:
+            with open(session_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            sessions = []
+            for line in lines[-max_sessions:]:
+                try:
+                    sessions.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            if not sessions:
+                return {"oturum_sayisi": 0, "ortalama_sure_sn": 0, "en_cok_kullanilan_arac": "bilinmiyor"}
+            avg_duration = sum(s.get("duration_s", 0) for s in sessions) / len(sessions)
+            # En sık kullanılan araç? heatmap'ten bakabiliriz, ama geçmiş oturumlarda yoksa şimdilik boş
+            # Burada sadece oturum sayısı ve ortalama süre verelim.
+            return {
+                "oturum_sayisi": len(sessions),
+                "ortalama_sure_sn": round(avg_duration, 1),
+                "toplam_arac_kullanimi": sum(s.get("tools_total", 0) for s in sessions),
+                "ortalama_llm_cagrisi": round(sum(s.get("llm_calls", 0) for s in sessions) / len(sessions), 1),
+            }
+        except Exception as e:
+            self._log("error", f"Analitik yüklenemedi: {e}")
+            return {"hata": str(e)}
+
     def get_blacklisted_tools(self) -> list:
         return sorted(self._blacklisted_tools)
 
@@ -136,6 +165,22 @@ class ChatModule:
             data["_tool_last_fail_time"] = dict(self._tool_last_fail_time)
             with open(self._metrics_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
+
+            # H4-3: Oturum özetini JSONL dosyasına ekle
+            session_file = self._metrics_file.replace(".json", "_sessions.jsonl")
+            summary = {
+                "start": self._session_start_time,
+                "duration_s": self.metrics.get("session_suresi_sn", 0),
+                "tools_total": self.metrics.get("toplam_arac_cagrisi", 0),
+                "tools_success": self.metrics.get("basarili_arac_cagrisi", 0),
+                "tools_failed": self.metrics.get("basarisiz_arac_cagrisi", 0),
+                "llm_calls": self.metrics.get("toplam_llm_cagrisi", 0),
+                "panic_triggered": self._panic_mode,
+                "blacklisted_tools": len(self._blacklisted_tools),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            with open(session_file, "a", encoding="utf-8") as sf:
+                sf.write(json.dumps(summary, ensure_ascii=False) + "\n")
         except Exception as e:
             self._log("error", f"Metrikler kaydedilemedi: {e}")
 
