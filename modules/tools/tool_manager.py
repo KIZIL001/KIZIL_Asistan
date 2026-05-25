@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 
 
 class ToolManager:
+    MAX_PARAM_CHARS = 65536
     """Araçları kaydeder, LLM çıktısından çağrıları ayrıştırır ve çalıştırır."""
 
     def __init__(self) -> None:
@@ -53,8 +54,17 @@ class ToolManager:
             if tool_name not in self.tools:
                 results.append(f"[HATA] '{tool_name}' aracı bulunamadı.")
                 continue
+            # H2-3: Parametre güvenlik kontrolleri
+            raw_stripped = raw_params.strip()
+            if len(raw_stripped) > self.MAX_PARAM_CHARS:
+                results.append(f"[HATA] Parametre çok büyük ({len(raw_stripped)} > {self.MAX_PARAM_CHARS} karakter), reddedildi.")
+                continue
+            if "\x00" in raw_stripped or "\\x00" in raw_stripped:
+                results.append("[HATA] Parametre null byte içeriyor, reddedildi.")
+                continue
+            raw_clean = raw_stripped.replace("\\x00", "").replace("\x00", "")
             try:
-                params = json.loads(raw_params.strip()) if raw_params.strip() else {}
+                params = json.loads(raw_clean) if raw_clean else {}
             except json.JSONDecodeError:
                 snippet = raw_params.strip()[:80]
                 results.append(f"[HATA] JSON bozuk, çağrı atlandı: {snippet}...")
