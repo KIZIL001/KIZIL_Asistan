@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 import os
 from core.llm_router import LLMRouter
+from core.tool_reliability import ToolReliability
 from core.runtime_diagnostics import RuntimeDiagnostics
 from core.runtime_diagnostics import RuntimeDiagnostics
 from modules.tools.tool_manager import ToolManager
@@ -179,6 +180,9 @@ class ChatModule:
             data["_tool_last_fail_time"] = dict(self._tool_last_fail_time)
             with open(self._metrics_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
+
+            # Tool Reliability verisini kaydet
+            ToolReliability().save()
 
             # H4-3: Oturum özetini JSONL dosyasına ekle
             session_file = self._metrics_file.replace(".json", "_sessions.jsonl")
@@ -635,6 +639,7 @@ class ChatModule:
                 call_count += 1
             else:
                 self.metrics["basarili_arac_cagrisi"] += 1
+                ToolReliability().increment_call(current_tool)
                 fail_count = 0
                 last_tool = ""
                 messages.append({"role": "assistant", "content": response})
@@ -687,6 +692,7 @@ class ChatModule:
             return
         count = self._tool_fail_counts.get(tool_name, 0) + 1
         self._tool_fail_counts[tool_name] = count
+        ToolReliability().increment_failure(tool_name)
         RuntimeDiagnostics().increment("tool_failures")
         self._tool_last_fail_time[tool_name] = datetime.now(timezone.utc).isoformat()
         if count >= TOOL_BLACKLIST_THRESHOLD and tool_name not in self._blacklisted_tools:

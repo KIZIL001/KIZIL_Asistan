@@ -49,6 +49,7 @@ class Config:
             "ENABLE_FAILURE_CORPUS": True,
             "ENABLE_RUNTIME_DIAGNOSTICS": False,
             "ENABLE_DETERMINISM_GUARD": False,
+            "ENABLE_TOOL_RELIABILITY": False,
         }
 
     def __getattr__(self, name):
