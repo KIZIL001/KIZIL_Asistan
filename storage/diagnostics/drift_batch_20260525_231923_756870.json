@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-05-25T23:19:23.756865",
+  "type": "TEMPLATE_DRIFT_BATCH",
+  "count": 1,
+  "drifts": [
+    {
+      "template": "tanim",
+      "user_msg": "Python nedir?",
+      "response": "Python bir programlama dilidir.",
+      "expected_prefix": "📖"
+    }
+  ]
+}

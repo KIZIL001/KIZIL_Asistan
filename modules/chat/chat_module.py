@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 import os
 from core.llm_router import LLMRouter
 from core.tool_reliability import ToolReliability
+from core.prompt_discipline import PromptDiscipline
+from core.tool_reliability import ToolReliability
 from core.runtime_diagnostics import RuntimeDiagnostics
 from core.runtime_diagnostics import RuntimeDiagnostics
 from modules.tools.tool_manager import ToolManager
@@ -333,17 +335,33 @@ class ChatModule:
         try:
             from utils.config import Config
             if not Config()._data.get("ENABLE_RESPONSE_TEMPLATES", False):
+                # Prompt Discipline kontrolu
+                drift = PromptDiscipline().check(user_msg, response)
+                if drift:
+                    self._log("warning", f"Sablon sapmasi: {drift}")
                 return response
         except Exception:
+            # Prompt Discipline kontrolu
+            drift = PromptDiscipline().check(user_msg, response)
+            if drift:
+                self._log("warning", f"Sablon sapmasi: {drift}")
             return response
         
         if not response or not user_msg:
+            # Prompt Discipline kontrolu
+            drift = PromptDiscipline().check(user_msg, response)
+            if drift:
+                self._log("warning", f"Sablon sapmasi: {drift}")
             return response
         
         import re
         from pathlib import Path
         templates_path = Path("data/response_templates.json")
         if not templates_path.exists():
+            # Prompt Discipline kontrolu
+            drift = PromptDiscipline().check(user_msg, response)
+            if drift:
+                self._log("warning", f"Sablon sapmasi: {drift}")
             return response
         
         import json
@@ -352,6 +370,10 @@ class ChatModule:
         for name, tpl in templates.items():
             if re.search(tpl["pattern"], user_msg, re.IGNORECASE):
                 return tpl["template"].format(cevap=response)
+        # Prompt Discipline kontrolu
+        drift = PromptDiscipline().check(user_msg, response)
+        if drift:
+            self._log("warning", f"Sablon sapmasi: {drift}")
         return response
 
     def _sanitize_output(self, text: str) -> str:
@@ -640,6 +662,7 @@ class ChatModule:
             else:
                 self.metrics["basarili_arac_cagrisi"] += 1
                 ToolReliability().increment_call(current_tool)
+                ToolReliability().increment_call(current_tool)
                 fail_count = 0
                 last_tool = ""
                 messages.append({"role": "assistant", "content": response})
@@ -692,6 +715,7 @@ class ChatModule:
             return
         count = self._tool_fail_counts.get(tool_name, 0) + 1
         self._tool_fail_counts[tool_name] = count
+        ToolReliability().increment_failure(tool_name)
         ToolReliability().increment_failure(tool_name)
         RuntimeDiagnostics().increment("tool_failures")
         self._tool_last_fail_time[tool_name] = datetime.now(timezone.utc).isoformat()

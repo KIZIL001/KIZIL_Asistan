@@ -1,0 +1,8 @@
+{
+  "timestamp": "2026-05-25T23:14:27.832106",
+  "type": "TEMPLATE_DRIFT",
+  "template": "tanim",
+  "user_msg": "Python nedir?",
+  "response": "Python bir programlama dilidir.",
+  "expected_prefix": "📖"
+}

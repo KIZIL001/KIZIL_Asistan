@@ -50,6 +50,7 @@ class Config:
             "ENABLE_RUNTIME_DIAGNOSTICS": False,
             "ENABLE_DETERMINISM_GUARD": False,
             "ENABLE_TOOL_RELIABILITY": False,
+            "ENABLE_PROMPT_DISCIPLINE": False,
         }
 
     def __getattr__(self, name):
