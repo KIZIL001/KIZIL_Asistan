@@ -15,6 +15,7 @@ class PluginLoader:
     def __init__(self, orchestrator: "Orchestrator") -> None:
         self.orch = orchestrator
         self.plugin_dir = os.path.dirname(__file__)
+        self.plugin_manifests = {}
 
     def _safe_log(self, level: str, msg: str) -> None:
         """Logger yoksa print'e düşer, AttributeError çıkmaz."""
@@ -52,6 +53,23 @@ class PluginLoader:
             if not callable(mod.register):
                 return False, "'register' bir fonksiyon değil."
 
+            # Manifest kontrolü
+            if not hasattr(mod, "PLUGIN_MANIFEST"):
+                return False, "PLUGIN_MANIFEST tanımlı değil."
+            manifest = mod.PLUGIN_MANIFEST
+            if not isinstance(manifest, dict):
+                return False, "PLUGIN_MANIFEST bir dict olmalı."
+            required_keys = {"allowed_tools", "allowed_paths", "allow_network"}
+            missing = required_keys - set(manifest.keys())
+            if missing:
+                return False, f"Manifest eksik anahtarlar: {missing}"
+            if not isinstance(manifest["allowed_tools"], list):
+                return False, "allowed_tools bir liste olmalı."
+            if not isinstance(manifest["allowed_paths"], list):
+                return False, "allowed_paths bir liste olmalı."
+            if not isinstance(manifest["allow_network"], bool):
+                return False, "allow_network bir bool olmalı."
+
             return True, mod
         except Exception as e:
             return False, f"Doğrulama hatası: {e}"
@@ -77,6 +95,7 @@ class PluginLoader:
             try:
                 mod.register(self.orch)
                 loaded.append(name)
+                self.plugin_manifests[name] = mod.PLUGIN_MANIFEST
                 self._safe_log("info", f"Plugin yüklendi: {name}")
             except Exception as e:
                 self._safe_log("error", f"[PLUGIN HATASI] '{name}' register başarısız: {e}\n{traceback.format_exc()}")
