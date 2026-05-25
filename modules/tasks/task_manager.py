@@ -85,6 +85,38 @@ class TaskManager:
             if key not in task:
                 task[key] = default
         tasks = self._load()
+        # H2-5: depends_on varsa döngü kontrolü yap
+        if task.get("depends_on") and "id" in task:
+            new_id = task["id"]
+            dep_id = task["depends_on"]
+            # Kendine bağlılık
+            if new_id == dep_id:
+                raise ValueError("Bir görev kendisine bağlanamaz.")
+            # Mevcut görevlerden herhangi biri yeni göreve bağımlı mı?
+            for t in tasks:
+                if t.get("depends_on") == new_id:
+                    # Eğer yeni görev de o göreve bağımlıysa doğrudan döngü
+                    if dep_id == t["id"]:
+                        raise ValueError("Bu zincir döngü oluşturur, eklenemez.")
+            # Zincir takibi: dep_id'den başlayarak döngü ara
+            visited = set()
+            current = dep_id
+            max_depth = 100
+            while current and max_depth > 0:
+                if current == new_id:
+                    raise ValueError("Bu zincir döngü oluşturur, eklenemez.")
+                if current in visited:
+                    break
+                visited.add(current)
+                found = False
+                for t in tasks:
+                    if t["id"] == current:
+                        current = t.get("depends_on")
+                        found = True
+                        break
+                if not found:
+                    break
+                max_depth -= 1
         tasks.append(task)
         self._save(tasks)
 
@@ -257,9 +289,31 @@ class TaskManager:
         return info
 
     def can_complete(self, task_id: str) -> tuple[bool, str]:
-        info = self.get_chain_info(task_id)
-        if not info:
+        tasks = self._load()
+        task = None
+        for t in tasks:
+            if t["id"] == task_id:
+                task = t
+                break
+        if not task:
             return False, "Görev bulunamadı."
-        if info.get("blocked"):
-            return False, f"Bu görev #{info['blocked_by']} görevine bağlı. Önce onu tamamlamalısın."
+        # Zincirleme bağımlılık kontrolü: tüm üst görevler tamamlanmış olmalı
+        visited = set()
+        current = task.get("depends_on")
+        max_depth = 100
+        while current and max_depth > 0:
+            if current in visited:
+                break
+            visited.add(current)
+            parent = None
+            for t in tasks:
+                if t["id"] == current:
+                    parent = t
+                    break
+            if not parent:
+                break
+            if parent["status"] != "done":
+                return False, f"Bu görev #{current} görevine bağlı. Önce onu tamamlamalısın."
+            current = parent.get("depends_on")
+            max_depth -= 1
         return True, ""
