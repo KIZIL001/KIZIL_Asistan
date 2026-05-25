@@ -4,9 +4,66 @@ import importlib.util
 import traceback
 from types import ModuleType
 from typing import TYPE_CHECKING, Union
+from modules.tools.tool_manager import ToolManager
 
 if TYPE_CHECKING:
     from core.orchestrator import Orchestrator
+
+
+class FilteredToolManager:
+    def __init__(self, real_manager, allowed_tools, allowed_paths, allow_network):
+        self._real = real_manager
+        self.allowed_tools = allowed_tools
+        self.allowed_paths = allowed_paths
+        self.allow_network = allow_network
+
+    def parse_and_execute(self, text):
+        import re, json
+        match = re.search(r'\[TOOL_CALL:(\w+)\]', text)
+        if match:
+            tool_name = match.group(1)
+            if tool_name not in self.allowed_tools:
+                return f"[HATA] '{tool_name}' aracı bu plugin için izinli değil."
+            if not self.allow_network and (tool_name.startswith('browser_') or tool_name.startswith('http_')):
+                return f"[HATA] '{tool_name}' ağ izni olmadığı için kullanılamaz."
+            if tool_name in ('dosya_oku', 'dosya_yaz', 'dosya_listele'):
+                try:
+                    params_str = re.search(r'\[TOOL_CALL:\w+\]\s*(.*)', text, re.DOTALL)
+                    if params_str:
+                        params = json.loads(params_str.group(1).strip()) if params_str.group(1).strip() else {}
+                        dosya_yolu = params.get('dosya_yolu', params.get('dizin', ''))
+                        if dosya_yolu:
+                            if not any(dosya_yolu.startswith(ap) for ap in self.allowed_paths):
+                                return f"[HATA] '{dosya_yolu}' bu plugin için izinli bir yol değil."
+                except Exception:
+                    pass
+        return self._real.parse_and_execute(text)
+
+    def has_tool_call(self, text):
+        return self._real.has_tool_call(text)
+
+
+class PluginSandbox:
+    def __init__(self, orch, manifest):
+        self._orch = orch
+        self._manifest = manifest
+        self._filtered_tool_manager = None
+
+    @property
+    def tool_manager(self):
+        if self._filtered_tool_manager is None:
+            self._filtered_tool_manager = FilteredToolManager(
+                self._orch.tool_manager,
+                self._manifest["allowed_tools"],
+                self._manifest["allowed_paths"],
+                self._manifest["allow_network"]
+            )
+        return self._filtered_tool_manager
+
+    @property
+    def logger(self):
+        return self._orch.logger
+
 
 
 class PluginLoader:
@@ -93,7 +150,7 @@ class PluginLoader:
 
             mod = result
             try:
-                mod.register(self.orch)
+                mod.register(PluginSandbox(self.orch, mod.PLUGIN_MANIFEST))
                 loaded.append(name)
                 self.plugin_manifests[name] = mod.PLUGIN_MANIFEST
                 self._safe_log("info", f"Plugin yüklendi: {name}")
