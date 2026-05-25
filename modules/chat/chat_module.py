@@ -49,6 +49,8 @@ class ChatModule:
             "kirilan_zincir": 0,
             "toplam_llm_cagrisi": 0,
             "session_suresi_sn": 0,
+            "determinizm_skoru": 0.0,  # 0.0 - 1.0 arası
+            "determinizm_orneklem": 0,
         }
         self._metrics_file: str = ""
         self._tool_fail_counts: dict[str, int] = {}
@@ -59,6 +61,7 @@ class ChatModule:
         self.scratchpad: list[str] = []
         self._session_start_time: str = ""
         self._session_active: bool = False
+        self._determinism_cache: dict[int, str] = {}  # hash -> son yanıt (H4-4)
 
     def set_tool_manager(self, tm: ToolManager) -> None:
         self.tool_manager = tm
@@ -93,6 +96,8 @@ class ChatModule:
             "kirilan_zincir": self.metrics["kirilan_zincir"],
             "toplam_llm_cagrisi": self.metrics["toplam_llm_cagrisi"],
             "panic_mode": self._panic_mode,
+            "determinizm_skoru": self.metrics.get("determinizm_skoru", 0.0),
+            "determinizm_orneklem": self.metrics.get("determinizm_orneklem", 0),
         }
 
     def get_failure_heatmap(self) -> list[dict]:
@@ -136,6 +141,10 @@ class ChatModule:
             self._log("error", f"Analitik yüklenemedi: {e}")
             return {"hata": str(e)}
 
+    def get_determinism_score(self) -> float:
+        """Determinizm skorunu yüzde olarak döner (H4-4)."""
+        return round(self.metrics.get("determinizm_skoru", 0.0) * 100, 1)
+
     def get_blacklisted_tools(self) -> list:
         return sorted(self._blacklisted_tools)
 
@@ -148,12 +157,14 @@ class ChatModule:
         self.scratchpad: list[str] = []
         self._session_start_time: str = ""
         self._session_active: bool = False
+        self._determinism_cache: dict[int, str] = {}  # hash -> son yanıt (H4-4)
 
     def reset_metrics(self) -> None:
         for key in self.metrics:
             self.metrics[key] = 0
         self._tool_fail_counts.clear()
         self._tool_last_fail_time.clear()
+        self._determinism_cache.clear()
 
     def save_metrics(self) -> None:
         if not self._metrics_file:
@@ -499,6 +510,25 @@ class ChatModule:
 
             if len(messages) > MAX_MESSAGES or self._total_chars(messages) > MAX_TOTAL_CHARS:
                 messages = self._prune_messages(messages)
+
+        # H4-4: Determinizm skoru güncelle (pasif)
+        if response and not self._panic_mode:
+            msg_hash = hash(msg)
+            if msg_hash in self._determinism_cache:
+                # Daha önce aynı girdi geldi mi?
+                onceki_yanit = self._determinism_cache[msg_hash]
+                eslesme = 1.0 if onceki_yanit == response else 0.0
+                n = self.metrics["determinizm_orneklem"]
+                eski_skor = self.metrics["determinizm_skoru"]
+                # Kayan ortalama
+                self.metrics["determinizm_skoru"] = (eski_skor * n + eslesme) / (n + 1)
+                self.metrics["determinizm_orneklem"] = n + 1
+            self._determinism_cache[msg_hash] = response
+            # Önbellek büyümesini sınırla (son 256 benzersiz girdi)
+            if len(self._determinism_cache) > 256:
+                # En eski eklenenleri at (Python 3.7+ dict sıralı)
+                for _ in range(32):
+                    self._determinism_cache.pop(next(iter(self._determinism_cache)))
 
         if self._session_active and self._session_start_time:
             try:
