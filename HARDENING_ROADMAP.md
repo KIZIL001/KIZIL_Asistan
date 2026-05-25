@@ -21,7 +21,7 @@
 
 | # | Zayıflık | Durum |
 |---|----------|-------|
-| 1 | Plugin izin kaçakları | ⏳ Bekliyor |
+| 1 | Plugin izin kaçakları | ✅ Tamamlandı |
 | 2 | Path bypass (sandbox aşımı) | ⏳ Bekliyor |
 | 3 | Malformed input (JSON injection vb.) | ⏳ Bekliyor |
 | 4 | Memory corruption (vektör/delta bozulması) | ⏳ Bekliyor |
