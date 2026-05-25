@@ -9,6 +9,7 @@ from typing import Optional
 
 MAX_VECTORS = 10_000
 DELTA_MERGE_THRESHOLD = 100
+DELTA_SIZE_THRESHOLD = 64 * 1024  # 64 KB
 
 
 class VectorStore:
@@ -71,14 +72,13 @@ class VectorStore:
         except (IOError, json.JSONDecodeError):
             self._save()
             return
-        # Delta eşiği aşıldıysa merge yap
+        # Delta boyutu eşiği aşıldıysa merge yap (O(1) disk meta okuması)
         if os.path.exists(self.delta_file):
             try:
-                with open(self.delta_file, "r", encoding="utf-8") as f:
-                    delta_count = sum(1 for _ in f)
-                if delta_count >= DELTA_MERGE_THRESHOLD:
+                delta_size = os.path.getsize(self.delta_file)
+                if delta_size >= DELTA_SIZE_THRESHOLD:
                     self._save()
-            except IOError:
+            except OSError:
                 self._save()
 
     def search(self, query_vector: list[float], top_k: int = 3,
@@ -120,3 +120,8 @@ class VectorStore:
         """Tüm kayıtlı metinleri döner (thread-safe)."""
         with self._lock:
             return [item["text"] for item in self._data]
+
+    def get_all_entries(self) -> list[dict]:
+        """Tüm kayıtların bir kopyasını döner (text, vector, timestamp). Thread-safe."""
+        with self._lock:
+            return [dict(item) for item in self._data]
