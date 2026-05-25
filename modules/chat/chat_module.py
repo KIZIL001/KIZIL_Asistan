@@ -26,7 +26,8 @@ TOOL_RULES = """KURAL:
 8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir.
 9. Karmaşık görevlerde sistem sana bir [İÇ PLAN] verebilir, bu plana uyarak araçları sırayla çağır.
 10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir.
-11. Çok adımlı karmaşık hedefleri görevlere böl, zincirle, [İÇ PLAN] ile adım adım uygula, tamamlanınca kullanıcıya BAŞKA BİR ARAÇ ÇAĞIRMADAN kısa bir özet rapor sun."""
+11. Çok adımlı karmaşık hedefleri görevlere böl, zincirle, [İÇ PLAN] ile adım adım uygula, tamamlanınca kullanıcıya BAŞKA BİR ARAÇ ÇAĞIRMADAN kısa bir özet rapor sun.
+12. Önemli bulgularını veya sonraki adım için gereken bilgiyi [NOT: buraya] formatında not alabilirsin. Bu notlar geçicidir, sohbet geçmişine eklenmez."""
 
 
 def _normalize_text(text: str) -> str:
@@ -50,6 +51,7 @@ class ChatModule:
         self._blacklisted_tools: set[str] = set()
         self._panic_mode = False
         self._panic_count = 0
+        self.scratchpad: list[str] = []
 
     def set_tool_manager(self, tm: ToolManager) -> None:
         self.tool_manager = tm
@@ -82,6 +84,7 @@ class ChatModule:
     def reset_panic(self) -> None:
         self._panic_mode = False
         self._panic_count = 0
+        self.scratchpad: list[str] = []
 
     def reset_metrics(self) -> None:
         for key in self.metrics:
@@ -119,7 +122,7 @@ class ChatModule:
         for pattern in vague_patterns:
             if pattern in msg_lower:
                 return True
-        if len(msg.split()) <= 1 and not self._should_use_tool(msg):
+        if len(msg.split()) <= 1:
             return True
         return False
 
@@ -256,6 +259,13 @@ class ChatModule:
             self._log("warning", "LLM boş yanıt döndü.")
             return "Üzgünüm, şu anda yanıt alamıyorum. Lütfen tekrar dener misin?"
 
+        not_pattern = r'\[NOT:\s*(.*?)\s*\]'
+        for n in re.findall(not_pattern, response, re.DOTALL):
+            n = n.strip()
+            if n and n not in self.scratchpad:
+                self.scratchpad.append(n)
+        response = re.sub(not_pattern, '', response).strip()
+
         if self._panic_mode:
             return self._sanitize_output(response)
 
@@ -346,6 +356,11 @@ class ChatModule:
                     "content": f"[SİSTEM] Araç sonucu:\n{tool_result}\n\nBu sonucu kullanarak kullanıcıya Türkçe yanıt ver."
                 })
                 response = self.router.chat(messages)
+                for n in re.findall(r'\[NOT:\s*(.*?)\s*\]', response, re.DOTALL):
+                    n = n.strip()
+                    if n and n not in self.scratchpad:
+                        self.scratchpad.append(n)
+                response = re.sub(r'\[NOT:\s*(.*?)\s*\]', '', response).strip()
                 call_count += 1
             else:
                 self.metrics["basarili_arac_cagrisi"] += 1
