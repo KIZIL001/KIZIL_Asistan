@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import os
 from core.llm_router import LLMRouter
 from modules.tools.tool_manager import ToolManager
+from modules.chat.prompt_firewall import check_firewall
 
 MAX_TOOL_CALLS = 3
 TOOL_FAIL_LIMIT = 2
@@ -266,6 +267,86 @@ class ChatModule:
             text = text[:5000] + "\n... (mesaj kısaltıldı)"
         return text
 
+    
+    def _check_firewall(self, text: str) -> str:
+        """Config açıksa firewall'u çağır, değilse boş dön."""
+        try:
+            from utils.config import Config
+            if not Config()._data.get("ENABLE_PROMPT_FIREWALL", False):
+                return ""
+        except Exception:
+            return ""
+        return check_firewall(text) or ""
+
+    def _check_context_poisoning(self, msg: str, history: list) -> tuple[str, list]:
+        """Bağlam zehirlenmesi girişimlerini tespit et, gerekiyorsa bağlamı kırp ve uyarı ekle.
+        Dönüş: (msg, history) — temizlenmiş veya aynı."""
+        if not self._context_defense_enabled():
+            return msg, history
+        
+        poisoning_patterns = [
+            (r"\[SYSTEM\s*\]", "Sistem talimatı taklidi"),
+            (r"\[system\s*\]", "Sistem talimatı taklidi (lowercase)"),
+            (r"\[TOOL_CALL:\w+\]", "Araç çağrısı taklidi"),
+            (r"(?i)ignore.*previous.*instructions", "Önceki talimatları yok sayma girişimi"),
+            (r"(?i)you are now.*assistant", "Rol değiştirme girişimi"),
+            (r"(?i)forget.*(all|everything)", "Hafıza silme girişimi"),
+        ]
+        
+        import re
+        alerts = []
+        for pattern, desc in poisoning_patterns:
+            if re.search(pattern, msg):
+                alerts.append(f"[GÜVENLİK: {desc} tespit edildi]")
+        
+        if alerts:
+            self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {'; '.join(alerts)}")
+            # Bağlamı kırp (history'i temizle)
+            history = []
+            msg = "\n".join(alerts) + "\n" + msg
+        
+        # Aşırı tekrarlayan pattern kontrolü (spam)
+        if len(msg) > 1000:
+            # Mesajın ilk 200 karakteri ile son 200 karakterini karşılaştır
+            # Eğer çok benzerlerse spam olabilir
+            pass  # Şimdilik basit tut
+        
+        return msg, history
+
+    def _context_defense_enabled(self) -> bool:
+        try:
+            from utils.config import Config
+            return Config()._data.get("ENABLE_CONTEXT_POISONING_DEFENSE", False)
+        except Exception:
+            return False
+
+    
+    def _apply_template(self, response: str, user_msg: str) -> str:
+        """Kullanıcı sorusuna göre uygun şablonu uygula. Uymazsa dokunma."""
+        try:
+            from utils.config import Config
+            if not Config()._data.get("ENABLE_RESPONSE_TEMPLATES", False):
+                return response
+        except Exception:
+            return response
+        
+        if not response or not user_msg:
+            return response
+        
+        import re
+        from pathlib import Path
+        templates_path = Path("data/response_templates.json")
+        if not templates_path.exists():
+            return response
+        
+        import json
+        templates = json.loads(templates_path.read_text(encoding="utf-8"))
+        
+        for name, tpl in templates.items():
+            if re.search(tpl["pattern"], user_msg, re.IGNORECASE):
+                return tpl["template"].format(cevap=response)
+        return response
+
     def _sanitize_output(self, text: str) -> str:
         if not text:
             return text
@@ -274,6 +355,54 @@ class ChatModule:
 
     def _total_chars(self, messages: list) -> int:
         return sum(len(m.get("content", "")) for m in messages)
+
+    
+    def _jaccard_prune(self, messages: list, user_msg: str, safe_zone: int = 3) -> list:
+        """Jaccard benzerliğine göre eski mesajları buda.
+        safe_zone: sistem promptu + son N mesaj korunur (varsayılan 3 = son 3 tur).
+        Hata durumunda veya config kapalıysa fallback: geleneksel _prune_messages."""
+        try:
+            from utils.config import Config
+            if not Config()._data.get("ENABLE_JACCARD_PRUNING", False):
+                return self._prune_messages(messages)
+        except Exception:
+            return self._prune_messages(messages)
+        
+        if not messages or not user_msg:
+            return messages
+        
+        # Safe-zone: sistem promptu + son safe_zone mesaj
+        system_msg = messages[0] if messages[0].get("role") == "system" else None
+        start_idx = 1 if system_msg else 0
+        safe_count = min(safe_zone, len(messages) - start_idx)
+        safe_messages = messages[:start_idx] + messages[-safe_count:] if safe_count > 0 else messages[:start_idx]
+        safe_ids = set(id(m) for m in safe_messages)
+        
+        # Budama adayları: safe-zone dışındaki mesajlar
+        candidates = [m for m in messages if id(m) not in safe_ids]
+        if not candidates:
+            return messages
+        
+        # Kullanıcı mesajının kelime kümesi (boş küme koruması)
+        user_words = set(user_msg.lower().split())
+        if not user_words:
+            return self._prune_messages(messages)
+        
+        kept = []
+        for m in candidates:
+            msg_words = set(m.get("content", "").lower().split())
+            if not msg_words:
+                continue
+            # Jaccard benzerliği
+            intersection = len(user_words & msg_words)
+            union = len(user_words | msg_words)
+            similarity = intersection / union if union > 0 else 0.0
+            if similarity >= 0.1:  # eşik değer %10
+                kept.append(m)
+        
+        # Safe-zone + Jaccard ile tutulanlar
+        result = [m for m in messages if id(m) in safe_ids or m in kept]
+        return result
 
     def _prune_messages(self, messages: list) -> list:
         if not messages:
@@ -328,6 +457,13 @@ class ChatModule:
             self._session_active = True
         self.metrics["toplam_llm_cagrisi"] += 1
         msg = self._sanitize_input(msg)
+        firewall_block = self._check_firewall(msg)
+        if firewall_block:
+            return firewall_block
+        poison_warning = self._check_context_poisoning(msg)
+        if poison_warning:
+            self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {poison_warning}")
+            return poison_warning
 
         action = self._decide_action(msg)
         if action == "ask":
@@ -353,8 +489,10 @@ class ChatModule:
         # history tip güvenliği: sadece list ise extend et
         history = safe_ctx.get("history")
         if isinstance(history, list):
-            messages.extend(history)
+            messages.extend(self._jaccard_prune(history, msg))
 
+                # Bağlam zehirlenmesi kontrolü
+        msg, _ = self._check_context_poisoning(msg, messages)
         messages.append({"role": "user", "content": msg})
 
         response = self.router.chat(messages)
@@ -370,7 +508,7 @@ class ChatModule:
         response = re.sub(not_pattern, '', response).strip()
 
         if self._panic_mode:
-            return self._sanitize_output(response)
+            return self._apply_template(self._sanitize_output(response), msg)
 
         # Context Drift kontrolü: [TOOL_CALL] yoksa Türkçe karakter ara
         if not any(k in response for k in ["[TOOL_CALL]"]):
@@ -537,7 +675,7 @@ class ChatModule:
             except Exception:
                 pass
         self.save_metrics()
-        return self._sanitize_output(response)
+        return self._apply_template(self._sanitize_output(response), msg)
 
     def _inc_tool_fail(self, tool_name: str) -> None:
         if tool_name == "bilinmeyen":

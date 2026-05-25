@@ -1,4 +1,5 @@
 {
+  "ENABLE_UNCERTAINTY_FILTER": true,
   "STORAGE_DIR": "storage",
   "CONVERSATIONS_DIR": "conversations",
   "MEMORY_DIR": "memory",
@@ -7,5 +8,13 @@
   "LLM_MODEL": "llama3.2:3b",
   "SUMMARY_MAX_LINES": 50,
   "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz.",
-  "test_key": "value_4_9"
+  "test_key": "value_4_9",
+  "ENABLE_DECISION_TRACE": true,
+  "ENABLE_CONTEXT_POISONING_DEFENSE": true,
+  "ENABLE_JACCARD_PRUNING": true,
+  "ENABLE_RESPONSE_TEMPLATES": true,
+  "ENABLE_TOOL_VERIFICATION": true,
+  "ENABLE_PROMPT_FIREWALL": true,
+  "ENABLE_GOLDEN_SESSION_RECORDING": true,
+  "ENABLE_FAILURE_CORPUS": true
 }

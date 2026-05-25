@@ -6,3 +6,9 @@ __pycache__/
 storage/kizil.log
 storage/conversations/gunluk.txt
 storage/tasks.json
+data/
+sessions/
+tests/failure_corpus/
+*.bak
+*.bak2
+storage/memory/vectors*.json

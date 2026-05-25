@@ -1,4 +1,7 @@
 import os
+from core.session_replay import SessionRecorder
+from core.failure_corpus import FailureRecorder
+from utils.config import Config
 import time
 import threading
 from datetime import datetime
@@ -44,6 +47,20 @@ class MemoryManager:
 
         self.logger = None
 
+
+        # Golden session recording
+        if Config()._data.get("ENABLE_GOLDEN_SESSION_RECORDING", False):
+            self._golden_recorder = SessionRecorder(
+                session_id=f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+        else:
+            self._golden_recorder = None
+
+        # Failure corpus recording
+        if Config()._data.get("ENABLE_FAILURE_CORPUS", False):
+            self._failure_recorder = FailureRecorder()
+        else:
+            self._failure_recorder = None
     def set_logger(self, logger):
         self.logger = logger
 
@@ -99,6 +116,8 @@ class MemoryManager:
             return vec
         except Exception as e:
             self._log("error", f"Embedding alınamadı: {e}")
+            if self._failure_recorder:
+                self._failure_recorder.record("embedding_error", str(e), {"context": "add_long_term"})
             return None
 
     def add_long_term(self, text: str) -> None:
@@ -136,6 +155,8 @@ class MemoryManager:
                 return results[:top_k]
             except Exception as e:
                 self._log("error", f"Hafıza sıralama hatası: {e}")
+                if self._failure_recorder:
+                    self._failure_recorder.record("memory_sort_error", str(e))
                 return []
 
     # ========================================================================
@@ -152,9 +173,16 @@ class MemoryManager:
                     f.write("-" * 30 + "\n")
             except Exception as e:
                 self._log("error", f"Konuşma kaydedilemedi: {e}")
+                if self._failure_recorder:
+                    self._failure_recorder.record("conversation_save_error", str(e))
 
             self.add_long_term(f"Kullanici: {user_input}\nKIZIL: {response}")
 
+
+            # Golden session recording
+            if self._golden_recorder:
+                self._golden_recorder.record_turn(user_input, response)
+                self._golden_recorder.save()
     def _read_last_lines(self, max_lines: int) -> str:
         if not os.path.exists(self.conversation_file):
             return ""
@@ -217,6 +245,8 @@ class MemoryManager:
             summary = chat_module._llm_yanit(prompt)
         except Exception as e:
             self._log("error", f"Özetleme LLM çağrısı başarısız: {e}")
+            if self._failure_recorder:
+                self._failure_recorder.record("llm_summary_error", str(e))
             return None, f"Özetleme sırasında LLM hatası oluştu: {e}"
         if not summary:
             return None, "Özet alınamadı."
@@ -280,4 +310,6 @@ class MemoryManager:
             return cevap if cevap else "Hafızamda bir şey bulamadım."
         except Exception as e:
             self._log("error", f"Hafıza arama LLM çağrısı başarısız: {e}")
+            if self._failure_recorder:
+                self._failure_recorder.record("llm_search_error", str(e))
             return f"Hafıza sorgulama sırasında LLM hatası oluştu: {e}"

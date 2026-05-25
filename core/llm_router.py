@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from utils.logger import Logger
+from core.uncertainty_filter import apply_filter
 
 
 class LLMRouter:
@@ -25,7 +26,6 @@ class LLMRouter:
         try:
             models = self._client.list()
             model_names = [m.get("name", "") for m in models.get("models", [])]
-            # Kısmi eşleşme: "llama3" -> "llama3.2:3b" veya "llama3:latest" ile eşleşsin
             if not any(self.model in m for m in model_names):
                 self._log("warning", f"'{self.model}' modeli Ollama'da bulunamadı. 'ollama pull {self.model}' ile yükleyin.")
         except Exception as e:
@@ -49,7 +49,10 @@ class LLMRouter:
         for attempt in range(retry + 1):
             try:
                 response = self._client.chat(**kwargs)
-                return response.get("message", {}).get("content", "")
+                content = response.get("message", {}).get("content", "")
+                if self._uncertainty_enabled():
+                    return apply_filter(content)
+                return content
             except Exception as e:
                 last_error = str(e)
                 if attempt < retry:
@@ -60,3 +63,11 @@ class LLMRouter:
                 else:
                     self._log("error", f"LLM çağrısı başarısız ({retry+1} deneme): {e}")
         return ""
+
+    def _uncertainty_enabled(self) -> bool:
+        """Config üzerinden filtre durumunu oku. Asla çökmez, varsayılan False."""
+        try:
+            from utils.config import Config
+            return Config()._data.get("ENABLE_UNCERTAINTY_FILTER", False)
+        except Exception:
+            return False

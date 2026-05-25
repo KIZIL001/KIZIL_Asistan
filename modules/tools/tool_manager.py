@@ -2,6 +2,7 @@
 import re
 import json
 import inspect
+from core.tool_verifier import verify_tool_output
 from typing import Any, Callable, Optional
 
 
@@ -74,6 +75,11 @@ class ToolManager:
                 filtered = self._filter_params(func, params)
                 result = func(**filtered)
                 results.append(f"[ARAÇ: {tool_name}]\n{result}")
+                verify_warning = verify_tool_output(tool_name, result)
+                if verify_warning:
+                    results[-1] = verify_warning + "\n" + results[-1]
+                if self._decision_trace_enabled():
+                    results[-1] = f"[Karar: {tool_name}]\n" + results[-1]
             except Exception as e:
                 results.append(f"[HATA] Araç çalışırken hata: {e}")
         return "\n\n".join(results) if results else None
@@ -81,3 +87,11 @@ class ToolManager:
     def has_tool_call(self, text: str) -> bool:
         """Metinde araç çağrısı var mı?"""
         return bool(re.search(r"\[TOOL_CALL:\w+\]", text))
+
+    def _decision_trace_enabled(self) -> bool:
+        """Config üzerinden karar izi durumunu oku. Asla çökmez."""
+        try:
+            from utils.config import Config
+            return Config()._data.get("ENABLE_DECISION_TRACE", False)
+        except Exception:
+            return False
