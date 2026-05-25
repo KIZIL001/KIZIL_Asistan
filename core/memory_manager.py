@@ -74,7 +74,17 @@ class MemoryManager:
         text_hash = hash(text)
         su_an = time.time()
         if len(self._embed_cache) > EMBED_CACHE_MAX:
-            self._embed_cache.clear()
+            # Önce süresi dolanları temizle
+            su_an = time.time()
+            expired = [h for h, (v, ts) in self._embed_cache.items() if su_an - ts > EMBED_CACHE_TTL]
+            for h in expired:
+                del self._embed_cache[h]
+            # Hâlâ sınır aşıldıysa en eski %25'i at
+            if len(self._embed_cache) > EMBED_CACHE_MAX:
+                sorted_items = sorted(self._embed_cache.items(), key=lambda x: x[1][1])
+                remove_count = max(1, int(len(sorted_items) * 0.25))
+                for h, _ in sorted_items[:remove_count]:
+                    del self._embed_cache[h]
         if text_hash in self._embed_cache:
             vec, ts = self._embed_cache[text_hash]
             if su_an - ts < EMBED_CACHE_TTL:
@@ -116,8 +126,9 @@ class MemoryManager:
                 if not q_vec:
                     return []
                 q = np.array(q_vec)
+                entries = self.vector_store.get_all_entries()
                 results = []
-                for item in self.vector_store._data:
+                for item in entries:
                     v = np.array(item["vector"])
                     cos = np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v) + 1e-9)
                     results.append((item["text"], float(cos)))
