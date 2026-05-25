@@ -40,12 +40,12 @@ def _safe_env() -> dict:
 def _safe_command(cmd: str) -> str:
     parts = cmd.strip().split()
     if not parts:
-        return "Komut belirtilmedi."
+        return "[HATA] Komut belirtilmedi."
     if len(parts) > 1:
-        return "Güvenlik: Komut argüman alamaz, sadece komut adı girin."
+        return "[HATA] Güvenlik: Komut argüman alamaz, sadece komut adı girin."
     base = parts[0]
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", base):
-        return f"Güvenlik: Geçersiz komut adı: {base}"
+        return f"[HATA] Güvenlik: Geçersiz komut adı: {base}"
     if base not in SAFE_COMMANDS:
         return f"Güvenlik: '{base}' izinli değil. İzinli komutlar: {', '.join(SAFE_COMMANDS)}"
     if _IS_WIN and base == "dir":
@@ -53,7 +53,7 @@ def _safe_command(cmd: str) -> str:
     else:
         cmd_path = shutil.which(base)
         if cmd_path is None:
-            return f"Komut bulunamadı: {base}"
+            return f"[HATA] Komut bulunamadı: {base}"
     try:
         if _IS_WIN and base == "dir":
             result = subprocess.run(
@@ -74,50 +74,50 @@ def _safe_command(cmd: str) -> str:
         output = out + err
         return output if output.strip() else "(komut çıktı vermedi)"
     except subprocess.TimeoutExpired:
-        return f"Komut zaman aşımına uğradı (5 saniye): {base}"
+        return f"[HATA] Komut zaman aşımına uğradı (5 saniye): {base}"
     except FileNotFoundError:
-        return f"Komut bulunamadı: {base}"
+        return f"[HATA] Komut bulunamadı: {base}"
     except Exception as e:
-        return f"Komut hatası: {e}"
+        return f"[HATA] Komut hatası: {e}"
 
 
 def _dosya_oku(dosya_yolu: str) -> str:
     try:
         safe = safe_path(dosya_yolu)
     except ValueError as e:
-        return f"Güvenlik: {e}"
+        return f"[HATA] Güvenlik: {e}"
     if not os.path.isfile(safe):
-        return f"Dosya bulunamadı: {safe}"
+        return f"[HATA] Dosya bulunamadı: {safe}"
     try:
         size = os.path.getsize(safe)
     except OSError:
-        return "Dosya boyutu okunamadı, güvenlik nedeniyle okunmadı."
+        return "[HATA] Dosya boyutu okunamadı, güvenlik nedeniyle okunmadı."
     if size > MAX_FILE_READ_BYTES:
-        return f"Dosya çok büyük ({size / 1024:.0f} KB), okunmadı. Sınır: {MAX_FILE_READ_BYTES // 1024} KB."
+        return f"[HATA] Dosya çok büyük ({size / 1024:.0f} KB), okunmadı. Sınır: {MAX_FILE_READ_BYTES // 1024} KB."
     try:
         with open(safe, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
     except UnicodeDecodeError:
-        return "Bu dosya metin formatında değil, okunamadı."
+        return "[HATA] Bu dosya metin formatında değil, okunamadı."
     except FileNotFoundError:
-        return "Dosya işlem sırasında silindi veya taşındı."
+        return "[HATA] Dosya işlem sırasında silindi veya taşındı."
     except PermissionError:
-        return "Dosya okuma izni yok."
+        return "[HATA] Dosya okuma izni yok."
     except Exception as e:
-        return f"Dosya okuma hatası: {e}"
+        return f"[HATA] Dosya okuma hatası: {e}"
 
 
 def _dosya_yaz(dosya_yolu: str, icerik: str) -> str:
     try:
         safe = safe_path(dosya_yolu)
     except ValueError as e:
-        return f"Güvenlik: {e}"
+        return f"[HATA] Güvenlik: {e}"
     if os.path.exists(safe):
         return f"Dosya zaten mevcut, üzerine yazılmadı: {safe}"
     try:
         os.makedirs(os.path.dirname(safe) or ".", exist_ok=True)
     except OSError as e:
-        return f"Dizin oluşturulamadı: {e}"
+        return f"[HATA] Dizin oluşturulamadı: {e}"
     tmp_fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(safe) or ".")
     try:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
@@ -126,9 +126,9 @@ def _dosya_yaz(dosya_yolu: str, icerik: str) -> str:
     except FileExistsError:
         return f"Dosya zaten mevcut, üzerine yazılmadı: {safe}"
     except PermissionError:
-        return "Dosya yazma izni yok."
+        return "[HATA] Dosya yazma izni yok."
     except Exception as e:
-        return f"Dosya yazma hatası: {e}"
+        return f"[HATA] Dosya yazma hatası: {e}"
     finally:
         if os.path.exists(tmp_path):
             try:
@@ -142,9 +142,9 @@ def _dosya_listele(dizin: str = ".") -> str:
     try:
         safe = safe_path(dizin)
     except ValueError as e:
-        return f"Güvenlik: {e}"
+        return f"[HATA] Güvenlik: {e}"
     if not os.path.isdir(safe):
-        return f"Dizin bulunamadı: {safe}"
+        return f"[HATA] Dizin bulunamadı: {safe}"
     entries = []
     try:
         with os.scandir(safe) as it:
@@ -163,7 +163,7 @@ def _dosya_listele(dizin: str = ".") -> str:
                 if len(entries) >= MAX_DIR_ENTRIES:
                     break
     except PermissionError:
-        return "Dizin listeleme izni yok."
+        return "[HATA] Dizin listeleme izni yok."
     entries.sort(key=lambda x: x[0].lower())
     secilenler = entries[:50]
     out = [f"{prefix} {name}" for name, prefix in secilenler]
