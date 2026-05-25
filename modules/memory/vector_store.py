@@ -49,19 +49,26 @@ class VectorStore:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             raise
-        # Merge sonrası delta dosyasını temizle
+        # Merge başarılı: delta dosyasını her zaman temizle
+        # (tüm geçerli veri zaten ana dosyada, bozuk satırlar kurtarılamaz)
         if os.path.exists(self.delta_file):
-            os.unlink(self.delta_file)
+            try:
+                os.unlink(self.delta_file)
+            except OSError:
+                pass  # silinemezse kalır, bir sonraki merge'de tekrar dene
 
     def add(self, text: str, vector: list[float]) -> None:
         """Yeni metin-vektör çifti ekler. Delta dosyasına incremental append yapar."""
         entry = {"text": text, "vector": vector, "timestamp": time.time()}
         self._data.append(entry)
-        # Delta dosyasına append (incremental write)
+        # Delta dosyasına append (incremental write) – H2-4: JSON doğrulamalı
+        entry_json = json.dumps(entry, ensure_ascii=False)
         try:
+            # Geçerli JSON olduğunu teyit et
+            json.loads(entry_json)
             with open(self.delta_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except IOError:
+                f.write(entry_json + "\n")
+        except (IOError, json.JSONDecodeError):
             self._save()
             return
         # Delta eşiği aşıldıysa merge yap
