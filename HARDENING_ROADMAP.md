@@ -12,7 +12,7 @@
 |---|----------|-------|
 | 1 | Hallucination Guard (sahte başarı raporu) | ✅ Tamamlandı |
 | 2 | Yanlış Tool Seçimi / Gereksiz Tool Çağrısı | ✅ Tamamlandı |
-| 3 | Retry Spam (aynı tool'u gereksiz tekrar) | ⏳ Bekliyor |
+| 3 | Retry Spam (aynı tool'u gereksiz tekrar) | ✅ Tamamlandı |
 | 4 | Context Drift (uzun oturumda bağlam kayması) | ⏳ Bekliyor |
 
 ---
