@@ -47,6 +47,7 @@ class Config:
             "ENABLE_CONTEXT_POISONING_DEFENSE": True,
             "ENABLE_GOLDEN_SESSION_RECORDING": False,
             "ENABLE_FAILURE_CORPUS": True,
+            "ENABLE_RUNTIME_DIAGNOSTICS": False,
         }
 
     def __getattr__(self, name):

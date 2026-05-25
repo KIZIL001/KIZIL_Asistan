@@ -4,6 +4,8 @@ import json
 from datetime import datetime, timezone
 import os
 from core.llm_router import LLMRouter
+from core.runtime_diagnostics import RuntimeDiagnostics
+from core.runtime_diagnostics import RuntimeDiagnostics
 from modules.tools.tool_manager import ToolManager
 from modules.chat.prompt_firewall import check_firewall
 
@@ -301,6 +303,7 @@ class ChatModule:
         
         if alerts:
             self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {'; '.join(alerts)}")
+            RuntimeDiagnostics().increment("poisoning_detections")
             # Bağlamı kırp (history'i temizle)
             history = []
             msg = "\n".join(alerts) + "\n" + msg
@@ -364,6 +367,7 @@ class ChatModule:
         try:
             from utils.config import Config
             if not Config()._data.get("ENABLE_JACCARD_PRUNING", False):
+                RuntimeDiagnostics().increment("context_prunes")
                 return self._prune_messages(messages)
         except Exception:
             return self._prune_messages(messages)
@@ -463,6 +467,7 @@ class ChatModule:
         poison_warning = self._check_context_poisoning(msg)
         if poison_warning:
             self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {poison_warning}")
+            RuntimeDiagnostics().increment("poisoning_detections")
             return poison_warning
 
         action = self._decide_action(msg)
@@ -682,6 +687,7 @@ class ChatModule:
             return
         count = self._tool_fail_counts.get(tool_name, 0) + 1
         self._tool_fail_counts[tool_name] = count
+        RuntimeDiagnostics().increment("tool_failures")
         self._tool_last_fail_time[tool_name] = datetime.now(timezone.utc).isoformat()
         if count >= TOOL_BLACKLIST_THRESHOLD and tool_name not in self._blacklisted_tools:
             self._blacklisted_tools.add(tool_name)

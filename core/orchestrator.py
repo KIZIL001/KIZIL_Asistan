@@ -15,6 +15,7 @@ from modules.profile import ProfileManager
 from modules.plugins.plugin_loader import PluginLoader
 from utils.logger import Logger
 from utils.config import Config
+from core.runtime_diagnostics import RuntimeDiagnostics
 
 AUTO_SUMMARIZE_THRESHOLD = 20
 
@@ -151,6 +152,11 @@ class Orchestrator:
                 if not girdi:
                     continue
                 self._process(girdi)
+                diag = RuntimeDiagnostics()
+                if diag._initialized:
+                    diag.turn_count += 1
+                    if diag.turn_count % diag.snapshot_interval == 0:
+                        diag.save()
         finally:
             self.stop()
 
@@ -625,6 +631,9 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         if not self.running:
             return
         self.chat.save_metrics()
+        diag = RuntimeDiagnostics()
+        if diag._initialized:
+            diag.save()
         self.session.end_session()
         self.running = False
         self.logger.info("KIZIL Asistan kapatılıyor.")

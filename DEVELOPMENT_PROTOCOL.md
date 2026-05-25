@@ -37,6 +37,13 @@ Her geliştirme isteğinde AI:
 3. Minimal çözüm önerir
 4. Gereksiz büyümeyi engeller
 5. Sonra patch üretir
+Bir patch:
+- tercihen 30 satırı,
+- maksimum 80 satırı
+
+geçmemelidir.
+
+Daha büyük değişiklikler parçalanmalıdır.
 
 Direkt kod üretmek yasaktır.
 
@@ -93,7 +100,7 @@ Aşağıdakiler yasaktır:
 * enterprise architecture
 * speculative design
 * geleceğe yönelik aşırı genişleme
-
+Çalışan sistem davranışını değiştirmeyen kozmetik refactor yasaktır.
 ---
 
 # 7. GELİŞTİRME STRATEJİSİ

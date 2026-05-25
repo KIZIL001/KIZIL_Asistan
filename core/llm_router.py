@@ -46,6 +46,9 @@ class LLMRouter:
         }
 
         last_error = ""
+        diag = RuntimeDiagnostics()
+        if diag._initialized:
+            diag.increment("llm_calls")
         for attempt in range(retry + 1):
             try:
                 response = self._client.chat(**kwargs)
@@ -56,11 +59,15 @@ class LLMRouter:
             except Exception as e:
                 last_error = str(e)
                 if attempt < retry:
+                    if diag._initialized:
+                        diag.increment("llm_retries")
                     self._log("warning",
                         f"LLM çağrısı başarısız (deneme {attempt+1}/{retry+1}), "
                         f"yeniden deneniyor: {e}")
                     time.sleep(2 ** attempt * 0.5)
                 else:
+                    if diag._initialized:
+                        diag.increment("llm_errors")
                     self._log("error", f"LLM çağrısı başarısız ({retry+1} deneme): {e}")
         return ""
 
