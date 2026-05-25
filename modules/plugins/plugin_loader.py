@@ -5,6 +5,7 @@ import traceback
 from types import ModuleType
 from typing import TYPE_CHECKING, Union
 from modules.tools.tool_manager import ToolManager
+from modules.tools.path_utils import safe_path
 
 if TYPE_CHECKING:
     from core.orchestrator import Orchestrator
@@ -16,6 +17,23 @@ class FilteredToolManager:
         self.allowed_tools = allowed_tools
         self.allowed_paths = allowed_paths
         self.allow_network = allow_network
+
+    def _check_path(self, path_str: str) -> bool:
+        """safe_path ile çözümle, izinli dizinlerden birinde mi kontrol et."""
+        try:
+            resolved = safe_path(path_str)
+        except (ValueError, FileNotFoundError):
+            return False
+        # Her bir izinli yolu da çöz, ortak yol karşılaştırması yap
+        for allowed in self.allowed_paths:
+            try:
+                allowed_resolved = safe_path(allowed)
+            except ValueError:
+                continue
+            common = __import__('os').path.commonpath([resolved, allowed_resolved])
+            if common == allowed_resolved:
+                return True
+        return False
 
     def parse_and_execute(self, text):
         import re, json
@@ -33,8 +51,8 @@ class FilteredToolManager:
                         params = json.loads(params_str.group(1).strip()) if params_str.group(1).strip() else {}
                         dosya_yolu = params.get('dosya_yolu', params.get('dizin', ''))
                         if dosya_yolu:
-                            if not any(dosya_yolu.startswith(ap) for ap in self.allowed_paths):
-                                return f"[HATA] '{dosya_yolu}' bu plugin için izinli bir yol değil."
+                            if not self._check_path(dosya_yolu):
+                                return f"[HATA] '{dosya_yolu}' bu plugin için izinli bir yol değil (sandbox dışı)."
                 except Exception:
                     pass
         return self._real.parse_and_execute(text)
