@@ -26,6 +26,7 @@ TOOL_RULES = """KURAL:
 8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir.
 9. Karmaşık görevlerde sistem sana bir [İÇ PLAN] verebilir, bu plana uyarak araçları sırayla çağır.
 10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir.
+11. [KRİTİK] Kullanıcının sorusu açıkça yerel bir dosya işlemi, dizin listeleme veya sistem komutu gerektirmiyorsa ASLA araç ([TOOL_CALL]) tetikleme. Sohbet, selamlama, genel bilgi veya analiz sorularına doğrudan metin olarak cevap ver. Gereksiz araç çağrısı sistem hatası sayılır.
 11. Çok adımlı karmaşık hedefleri görevlere böl, zincirle, [İÇ PLAN] ile adım adım uygula, tamamlanınca kullanıcıya BAŞKA BİR ARAÇ ÇAĞIRMADAN kısa bir özet rapor sun.
 12. Önemli bulgularını veya sonraki adım için gereken bilgiyi [NOT: buraya] formatında not alabilirsin. Bu notlar geçicidir, sohbet geçmişine eklenmez."""
 
