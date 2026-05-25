@@ -35,7 +35,7 @@
 |---|----------|-------|
 | 1 | Uzun session bellek basıncı | ⏳ Bekliyor |
 | 2 | Vector degradation (delta birikimi) | ✅ Tamamlandı |
-| 3 | Pruning stability (agresif budama) | ⏳ Bekliyor |
+| 3 | Pruning stability (agresif budama) | ✅ İncelendi – ek işlem gerekmez |
 | 4 | Timeout edge-cases (yarım kalan işlem) | ⏳ Bekliyor |
 
 ---
