@@ -270,6 +270,25 @@ class ChatModule:
         if self._panic_mode:
             return self._sanitize_output(response)
 
+        # Context Drift kontrolü: [TOOL_CALL] yoksa Türkçe karakter ara
+        if not any(k in response for k in ["[TOOL_CALL]"]):
+            if not any(c in response for c in "çğıöşüÇĞİÖŞÜ"):
+                self._log("warning", "Context Drift tespit edildi (Türkçe karakter yok). Tek seferlik kurtarma deneniyor...")
+                recovery_msg = messages + [{"role": "user", "content": "[SİSTEM] HATA: Önceki yanıtın anlaşılamadı. Lütfen sadece Türkçe yanıt ver veya gerekli aracı [TOOL_CALL:arac_adi] formatında çağır."}]
+                recovery_response = self.router.chat(recovery_msg)
+                if recovery_response:
+                    response = recovery_response
+
+        # Context Drift kontrolü: [TOOL_CALL] yoksa Türkçe karakter ara
+        if not any(k in response for k in ["[TOOL_CALL]"]):
+            if not any(c in response for c in "çğıöşüÇĞİÖŞÜ"):
+                self._log("warning", "Context Drift tespit edildi (Türkçe karakter yok). Tek seferlik kurtarma deneniyor...")
+                recovery_msg = messages + [{"role": "user", "content": "[SİSTEM] HATA: Önceki yanıtın anlaşılamadı. Lütfen sadece Türkçe yanıt ver veya gerekli aracı [TOOL_CALL:arac_adi] formatında çağır."}]
+                recovery_response = self.router.chat(recovery_msg)
+                if recovery_response:
+                    response = recovery_response
+                # Kurtarma başarısız olursa mevcut response'u koru (fallback)
+
         call_count = 0
         fail_count = 0
         last_tool = ""
