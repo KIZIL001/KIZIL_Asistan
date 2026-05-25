@@ -155,3 +155,19 @@ Yeni geliştirmeler:
 
 Her büyük değişiklik:
 önce git snapshot ile korunmalıdır.
+
+## ARCHITECTURAL MATURITY STATE
+
+KIZIL mimarisi artık "expansion phase" değil, "stability phase" içindedir.
+
+Bu nedenle:
+- yeni subsystem eklemek yerine,
+- mevcut subsystemlerin gözlemlenebilirliği,
+- deterministikliği,
+- güvenli hata davranışı,
+- veri bütünlüğü
+
+önceliklidir.
+
+Mimari büyütülmez.
+Mimari stabilize edilir.

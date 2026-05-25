@@ -151,3 +151,21 @@ bir sistem olarak kalmalıdır.
 
 Her geliştirme:
 bu prensibi korumak zorundadır.
+
+
+## REGRESSION GOVERNANCE
+
+Her değişiklik:
+1. Regression fixture testlerinden geçmeli
+2. Replay testleriyle doğrulanmalı
+3. Determinism hash sapması üretmemeli
+4. Yeni telemetry yükü oluşturmamalı
+5. Config drift üretmemeli
+
+Eğer bir değişiklik:
+- yeni abstraction gerektiriyorsa,
+- yeni lifecycle oluşturuyorsa,
+- yeni orchestration mantığı istiyorsa,
+- mevcut sequential akışı karmaşıklaştırıyorsa
+
+REDDEDİLMELİDİR.

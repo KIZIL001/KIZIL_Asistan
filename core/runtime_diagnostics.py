@@ -62,7 +62,7 @@ class RuntimeDiagnostics:
         if not self._enabled:
             return ""
         snap = self.snapshot()
-        fname = f"diag_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        fname = f"diag_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.json"
         path = self.storage_dir / fname
         path.write_text(json.dumps(snap, indent=2, ensure_ascii=False))
         return str(path)
