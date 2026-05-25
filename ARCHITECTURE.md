@@ -1,83 +1,157 @@
-# KIZIL Asistan - Mimari
+# KIZIL Asistan — Mimari Dokümantasyon
 
-## Çekirdek Sistem
+# Mimari Amaç
 
-### core/orchestrator.py
+KIZIL:
+yerel çalışan,
+modüler,
+deterministik,
+tool-enabled AI runtime sistemidir.
 
-Ana yönetici.
-Komut yönlendirme merkezi.
-
-### core/llm_router.py
-
-LLM bağlantısı.
-Ollama iletişimi.
-
-### core/memory_manager.py
-
-Hafıza sistemi.
-Konuşma geçmişi ve özetleme.
+Amaç:
+tek kullanıcı için
+kontrollü otonomluk sağlayan
+hafif bir AI çalışma ortamı oluşturmaktır.
 
 ---
 
-# Modüller
+# Runtime Modeli
+
+KIZIL:
+
+* sequential runtime
+* synchronous execution
+* single process
+
+mantığında çalışır.
+
+Ana akış:
+
+main.py
+→ orchestrator
+→ chat_module
+→ tool_manager
+→ tool execution
+→ memory update
+
+şeklindedir.
+
+---
+
+# Çekirdek Katmanlar
+
+## core/
+
+Sistemin merkezi kontrol katmanı.
+
+### orchestrator.py
+
+Ana yönetici.
+Komut yönlendirme,
+modül koordinasyonu,
+runtime kontrolü.
+
+İş mantığı burada dağılmamalıdır.
+
+---
+
+### llm_router.py
+
+LLM bağlantısı.
+Model çağrıları,
+retry sistemi,
+temperature kontrolü.
+
+---
+
+### memory_manager.py
+
+Konuşma hafızası,
+özetleme,
+bağlam yönetimi,
+uzun süreli hafıza erişimi.
+
+---
+
+# Modül Katmanı
 
 ## modules/chat/
 
-Sohbet sistemi.
+LLM davranış katmanı.
+Tool kararları,
+planlama,
+cevap üretimi.
+
+---
 
 ## modules/tools/
 
-Araç sistemi.
+Araç kayıt sistemi.
+Tool execution merkezi.
+
+Yeni araçlar:
+ToolManager üzerinden bağlanmalıdır.
+
+---
 
 ## modules/tasks/
 
 Görev sistemi.
 
-## modules/browser/
+Task lifecycle:
 
-Web araçları.
+pending
+→ running
+→ done / failed / cancelled
 
-## modules/files/
+mantığında çalışmalıdır.
 
-Dosya sistemi.
+Sequential execution zorunludur.
 
-## modules/automation/
+---
 
-Bilgisayar otomasyonu.
+## modules/memory/
 
-## modules/profile/
+Vektör hafıza sistemi.
 
-Kullanıcı tercihleri.
+Semantic search,
+memory ranking,
+context filtering.
 
-## modules/session/
-
-Oturum sistemi.
+---
 
 ## modules/plugins/
 
-Eklenti sistemi.
+Dinamik plugin yükleme sistemi.
+
+Pluginler:
+sandbox sınırları içinde çalışmalıdır.
 
 ---
 
-# Veri Deposu
+# Mimari Yasaklar
 
-## storage/
+Aşağıdakiler mimari ihlal sayılır:
 
-Tüm veriler burada tutulur.
-
-* config.json
-* tasks.json
-* profile.json
-* vectors.json
-* sessions.json
+* async runtime
+* distributed orchestration
+* event-driven microservice structure
+* uncontrolled background loops
+* recursive autonomous execution
+* self-modifying runtime
 
 ---
 
-# Mimari Kurallar
+# Geliştirme Kuralları
 
-1. Orchestrator sadece yönlendirme yapmalı.
-2. İş mantığı modüllerde olmalı.
-3. Modüller birbirine aşırı bağımlı olmamalı.
-4. Tool sistemi merkezi olmalı.
-5. Config merkezi kullanılmalı.
-6. Güvenlik kontrolleri bypass edilmemeli.
+Yeni geliştirmeler:
+
+* minimal patch
+* düşük risk
+* geri alınabilir değişiklik
+* küçük commitler
+
+şeklinde ilerlemelidir.
+
+Her büyük değişiklik:
+önce git snapshot ile korunmalıdır.
