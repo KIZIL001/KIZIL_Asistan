@@ -194,6 +194,10 @@ def main():
         if os.path.exists(safe_flag):
             os.remove(safe_flag)
         print("[TEST MODU] Safe-mode bypass edildi, test ortamı sıfırlandı.")
+        # Watchdog bypass: test sırasında stability_watchdog.json'u temizle
+        wd_file = "storage/stability_watchdog.json"
+        if os.path.exists(wd_file):
+            os.remove(wd_file)
 
     fixtures = load_fixtures()
     all_results = {}

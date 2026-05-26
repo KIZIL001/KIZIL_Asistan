@@ -16,6 +16,7 @@ from modules.plugins.plugin_loader import PluginLoader
 from utils.logger import Logger
 from utils.config import Config
 from core.runtime_diagnostics import RuntimeDiagnostics
+from core.stability_watchdog import StabilityWatchdog
 
 AUTO_SUMMARIZE_THRESHOLD = 20
 
@@ -94,6 +95,7 @@ class Orchestrator:
         self._action_history: deque[dict] = deque(maxlen=100)
         self._son_girdi: str | None = None
         self._crash_detected: bool = False
+        self.watchdog = StabilityWatchdog()
 
         self.running = False
 
@@ -143,6 +145,7 @@ class Orchestrator:
     def start(self) -> None:
         self.running = True
         self.session.start_session()
+        self.watchdog.on_start()
         self.logger.info("KIZIL Asistan başlatılıyor...")
         print("KIZIL Asistan başlatıldı.")
         print("Komutlar için 'yardım' yazabilirsin.\n")
@@ -196,6 +199,7 @@ class Orchestrator:
                             return
 
             self._chat(girdi)
+            self.watchdog.heartbeat()
 
         except Exception as e:
             self.logger.error(f"İşlem hatası: {e}", exc_info=True)
@@ -573,6 +577,12 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
                 print("  Durum: İyileştirme gerekli 🔴")
         else:
             print("  Durum: Henüz araç çağrısı yapılmamış.")
+        # Stability Watchdog raporu
+        wd = self.watchdog.get_report()
+        print("\n  30 Günlük Kararlılık Gözlemi:")
+        print(f"  Toplam oturum: {wd['total_sessions']}")
+        print(f"  Anormal kapanış: {wd['total_crashes']}")
+        print(f"  Toplam çalışma süresi: {wd['total_uptime_seconds'] // 3600}s { (wd['total_uptime_seconds'] % 3600) // 60 }dk")
 
     def _show_blacklist(self) -> None:
         blacklisted = self.chat.get_blacklisted_tools()
@@ -645,6 +655,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
         diag = RuntimeDiagnostics()
         if diag._initialized:
             diag.save()
+        self.watchdog.on_stop()
         self.session.end_session()
         self.running = False
         self.logger.info("KIZIL Asistan kapatılıyor.")
