@@ -27,6 +27,8 @@ class Config:
                 self._data = self._defaults()
         else:
             self._data = self._defaults()
+        if "_last_hash" not in self._data:
+            self._data["_last_hash"] = self._compute_hash()
 
     def _defaults(self):
         return {
@@ -61,8 +63,11 @@ class Config:
 
     def set(self, key: str, value):
         with self._lock:
+            if self._data.get("_frozen", False):
+                raise PermissionError(f"Config dondurulmuş. '{key}' değiştirilemez.")
             self._data[key] = value
             self._save()
+            self._save_backup("auto")
 
     def _save(self):
         """Atomik yazma: \u00f6nce ge\u00e7ici dosyaya, sonra replace."""
@@ -82,3 +87,86 @@ class Config:
         """D\u0131\u015far\u0131dan \u00e7a\u011fr\u0131labilecek kaydetme (thread-safe)."""
         with self._lock:
             self._save()
+
+    # ========================================================================
+    # CONFIG IMMUTABILITY & ROLLBACK (Faz 3)
+    # ========================================================================
+
+    def freeze(self) -> None:
+        """Config'i dondur. Bundan sonra set() çağrıları reddedilir."""
+        with self._lock:
+            self._data["_frozen"] = True
+            self._save()
+        self._save_backup("frozen")
+
+    def unfreeze(self) -> None:
+        """Config dondurmayı kaldır."""
+        with self._lock:
+            self._data["_frozen"] = False
+            self._save()
+
+    def is_frozen(self) -> bool:
+        return self._data.get("_frozen", False)
+
+    def _compute_hash(self) -> str:
+        """Config verisinin deterministik hash'i (meta anahtarlar hariç)."""
+        import hashlib
+        import json
+        data_to_hash = {k: v for k, v in self._data.items() if not k.startswith("_")}
+        serialized = json.dumps(data_to_hash, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:16]
+
+    def detect_drift(self) -> bool:
+        """Binary drift tespiti. True = sapma var."""
+        with self._lock:
+            current = self._compute_hash()
+            saved = self._data.get("_last_hash", "")
+            return current != saved
+
+    def _save_backup(self, tag: str = "manual") -> None:
+        """Maksimum 5 yedek al, eskileri sil."""
+        import os
+        import json
+        backup_dir = os.path.join(self.STORAGE_DIR, "config_backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = os.path.join(backup_dir, f"config_{tag}_{timestamp}.json")
+        with open(backup_file, "w", encoding="utf-8") as f:
+            json.dump(self._data, f, indent=2, ensure_ascii=False)
+        backups = sorted([f for f in os.listdir(backup_dir) if f.startswith("config_")])
+        while len(backups) > 5:
+            oldest = backups.pop(0)
+            os.remove(os.path.join(backup_dir, oldest))
+
+    def rollback(self, backup_index: int = -1) -> bool:
+        """Belirtilen yedeğe dön. Varsayılan: en son yedek."""
+        import os
+        import json
+        backup_dir = os.path.join(self.STORAGE_DIR, "config_backups")
+        if not os.path.exists(backup_dir):
+            return False
+        backups = sorted([f for f in os.listdir(backup_dir) if f.startswith("config_")])
+        if not backups:
+            return False
+        try:
+            target = backups[backup_index]
+            target_path = os.path.join(backup_dir, target)
+            with open(target_path, "r", encoding="utf-8") as f:
+                backup_data = json.load(f)
+            with self._lock:
+                self._data = backup_data
+                self._data["_frozen"] = False
+                self._data["_last_hash"] = self._compute_hash()
+                self._save()
+            return True
+        except (IndexError, FileNotFoundError, json.JSONDecodeError):
+            return False
+
+    def list_backups(self) -> list:
+        """Mevcut yedeklerin listesi."""
+        import os
+        backup_dir = os.path.join(self.STORAGE_DIR, "config_backups")
+        if not os.path.exists(backup_dir):
+            return []
+        return sorted([f for f in os.listdir(backup_dir) if f.startswith("config_")])
+
