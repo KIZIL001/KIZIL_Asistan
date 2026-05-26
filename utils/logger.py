@@ -27,6 +27,8 @@ class Logger:
             ch.setFormatter(formatter)
             self.logger.addHandler(ch)
 
+        self._request_id: str = ""
+
     def debug(self, msg):
         prefix = f"[{self._request_id}] " if self._request_id else ""
         self.logger.debug(prefix + msg)

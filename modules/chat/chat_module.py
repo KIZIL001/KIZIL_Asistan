@@ -490,11 +490,11 @@ class ChatModule:
         firewall_block = self._check_firewall(msg)
         if firewall_block:
             return firewall_block
-        poison_warning = self._check_context_poisoning(msg)
-        if poison_warning:
-            self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {poison_warning}")
+        msg, _ = self._check_context_poisoning(msg, [])
+        if "[GÜVENLİK:" in msg:
+            self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {msg}")
             RuntimeDiagnostics().increment("poisoning_detections")
-            return poison_warning
+            return msg
 
         action = self._decide_action(msg)
         if action == "ask":

@@ -177,7 +177,7 @@ class Orchestrator:
                     continue
                 self._process(girdi)
                 diag = RuntimeDiagnostics()
-                if diag._initialized:
+                if hasattr(diag, '_initialized') and diag._initialized:
                     diag.turn_count += 1
                     if diag.turn_count % diag.snapshot_interval == 0:
                         diag.save()
@@ -225,7 +225,7 @@ class Orchestrator:
             self.logger.clear_request_id()
 
         except Exception as e:
-            self.logger.error(f"İşlem hatası: {e}", exc_info=True)
+            self.logger.error(f"İşlem hatası: {e}")
             print("KIZIL: Bir hata oluştu. Lütfen tekrar dene.")
 
     # ========================================================================
@@ -382,7 +382,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("  -> Model yüklü mü? 'ollama list' ile kontrol et.")
             return None
         except Exception as e:
-            self.logger.error(f"LLM hatası: {e}", exc_info=True)
+            self.logger.error(f"LLM hatası: {e}")
             print("KIZIL: LLM çağrısı sırasında hata oluştu.")
             print(f"  -> Hata: {e}")
             return None
@@ -394,11 +394,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("KIZIL:", resp)
             return resp
 
-                def _fallback_chat():
-            print("KIZIL: Üzgünüm, şu anda yanıt üretemiyorum. Lütfen tekrar deneyin.")
-            return None
-
-        resp = safe_call(self._safe_llm, istek, fallback=_fallback_chat, context="chat", _logger=self.logger)
+        resp = self._safe_llm(istek)
         if resp is not None:
             self.memory.save_conversation(msg, resp)
             self.memory.add_short_term("user", msg)
@@ -434,11 +430,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
                 print("KIZIL:", s)
             return s
 
-        def _fallback_summary():
-            print("KIZIL: Özet alınamadı.")
-            return None
-
-        safe_call(self._safe_llm, istek, fallback=_fallback_summary, context="summary", _logger=self.logger)
+        self._safe_llm(istek)
 
     def _remember(self, girdi: str) -> None:
         q = girdi.split(maxsplit=1)[1].strip() if " " in girdi else ""
@@ -451,7 +443,7 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("KIZIL:", a)
             return a
 
-                def _fallback_chat():
+        def _fallback_chat():
             print("KIZIL: Üzgünüm, şu anda yanıt üretemiyorum. Lütfen tekrar deneyin.")
             return None
 
@@ -683,12 +675,21 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
     # KAPANIŞ
     # ========================================================================
 
+
+    def _show_dashboard(self) -> None:
+        """Telemetry Dashboard panelini göster."""
+        from core.telemetry_dashboard import get_panel
+        try:
+            panel = get_panel()
+            print(panel)
+        except Exception as e:
+            print(f"Panel oluşturulamadı: {e}")
     def stop(self) -> None:
         if not self.running:
             return
         self.chat.save_metrics()
         diag = RuntimeDiagnostics()
-        if diag._initialized:
+        if hasattr(diag, '_initialized') and diag._initialized:
             diag.save()
         self.watchdog.on_stop()
         self.session.end_session()

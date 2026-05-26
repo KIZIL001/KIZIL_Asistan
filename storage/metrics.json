@@ -1,0 +1,12 @@
+{
+  "toplam_arac_cagrisi": 0,
+  "basarili_arac_cagrisi": 0,
+  "basarisiz_arac_cagrisi": 0,
+  "kirilan_zincir": 0,
+  "toplam_llm_cagrisi": 1,
+  "session_suresi_sn": 0,
+  "determinizm_skoru": 0.0,
+  "determinizm_orneklem": 0,
+  "_tool_fail_counts": {},
+  "_tool_last_fail_time": {}
+}
