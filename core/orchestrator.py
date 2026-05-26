@@ -100,6 +100,7 @@ class Orchestrator:
         self._action_history: deque[dict] = deque(maxlen=100)
         self._son_girdi: str | None = None
         self._crash_detected: bool = False
+        self._request_counter: int = 0
         self.watchdog = StabilityWatchdog()
 
         self.running = False
@@ -172,6 +173,10 @@ class Orchestrator:
             self.stop()
 
     def _process(self, girdi: str) -> None:
+        # Request ID üret ve Logger'a ilet
+        self._request_counter += 1
+        req_id = f"req_{self._request_counter:06d}"
+        self.logger.set_request_id(req_id)
         # Poison pill koruması: önceki çökmeden kurtarıldıysa aynı girdiyi atla
         if self._crash_detected and girdi == self._son_girdi:
             self.logger.warning(f"Poison pill tespit edildi, girdi atlanıyor: {girdi[:80]}...")
@@ -205,6 +210,7 @@ class Orchestrator:
 
             self._chat(girdi)
             self.watchdog.heartbeat()
+            self.logger.clear_request_id()
 
         except Exception as e:
             self.logger.error(f"İşlem hatası: {e}", exc_info=True)

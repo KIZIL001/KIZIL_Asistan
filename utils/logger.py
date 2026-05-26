@@ -28,16 +28,29 @@ class Logger:
             self.logger.addHandler(ch)
 
     def debug(self, msg):
-        self.logger.debug(msg)
+        prefix = f"[{self._request_id}] " if self._request_id else ""
+        self.logger.debug(prefix + msg)
 
     def info(self, msg):
-        self.logger.info(msg)
+        prefix = f"[{self._request_id}] " if self._request_id else ""
+        self.logger.info(prefix + msg)
 
     def warning(self, msg):
-        self.logger.warning(msg)
+        prefix = f"[{self._request_id}] " if self._request_id else ""
+        self.logger.warning(prefix + msg)
 
     def error(self, msg):
-        self.logger.error(msg)
+        prefix = f"[{self._request_id}] " if self._request_id else ""
+        self.logger.error(prefix + msg)
 
     def critical(self, msg):
-        self.logger.critical(msg)
+        prefix = f"[{self._request_id}] " if self._request_id else ""
+        self.logger.critical(prefix + msg)
+
+    def set_request_id(self, request_id: str) -> None:
+        """Her işlem (tur) başında çağrılır. Log satırlarına prefix olarak eklenir."""
+        self._request_id = request_id
+
+    def clear_request_id(self) -> None:
+        """İşlem sonunda request_id'yi temizler (log state pollution önlemi)."""
+        self._request_id = ""
