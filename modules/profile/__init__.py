@@ -71,20 +71,7 @@ class ProfileManager:
             return dict(self._data)
 
     def get_prompt(self) -> str:
-        with self._lock:
-            parts = []
-            if self._data.get("ad"):
-                parts.append(f"Kullanıcının adı: {self._data['ad']}.")
-            if self._data.get("tercihler"):
-                tercihler = self._data["tercihler"]
-                if tercihler:
-                    t_str = ", ".join(f"{k}: {v}" for k, v in tercihler.items())
-                    parts.append(f"Kullanıcının tercihleri: {t_str}.")
-            if self._data.get("notlar"):
-                parts.append(f"Kullanıcı hakkında notlar: {self._data['notlar']}.")
-            if parts:
-                return "KULLANICI PROFİLİ:\n" + "\n".join(parts)
-            return ""
+        return ""
 
     def update_from_summary(self, summary: str) -> None:
         with self._lock:

@@ -27,19 +27,19 @@ def get_panel() -> str:
     lines.append("=" * 60)
 
     # Stability Watchdog
-    wd = safe_call(_read_json, f"{STORAGE}/stability_watchdog.json",
+    wd = safe_call(_read_json, STORAGE + "/stability_watchdog.json",
                    fallback={}, context="watchdog")
     lines.append("  Toplam Oturum    : " + str(wd.get('total_sessions', '[VERI YOK]')))
     lines.append("  Anormal Kapanış  : " + str(wd.get('total_crashes', '[VERI YOK]')))
     uptime = wd.get('total_uptime_seconds', 0)
-    lines.append("  Toplam Uptime    : {}s {}dk".format(uptime//3600, (uptime%3600)//60))
+    lines.append("  Toplam Uptime    : {}s {}dk".format(uptime // 3600, (uptime % 3600) // 60))
 
     # Determinizm Skoru
-    metrics = safe_call(_read_json, f"{STORAGE}/metrics.json",
+    metrics = safe_call(_read_json, STORAGE + "/metrics.json",
                         fallback={}, context="metrics")
     det_skor = metrics.get("determinizm_skoru", None)
     if det_skor is not None:
-        lines.append("  Determinizm Skoru: %{}".format(round(det_skor*100, 1)))
+        lines.append("  Determinizm Skoru: %" + str(round(det_skor * 100, 1)))
     else:
         lines.append("  Determinizm Skoru: [VERI YOK]")
 
@@ -47,8 +47,8 @@ def get_panel() -> str:
     toplam = metrics.get("toplam_arac_cagrisi", 0)
     basarili = metrics.get("basarili_arac_cagrisi", 0)
     if toplam > 0:
-        oran = round(basarili/toplam*100, 1)
-        lines.append("  Araç Başarı Oranı: %{} ({}/{})".format(oran, basarili, toplam))
+        oran = round(basarili / toplam * 100, 1)
+        lines.append("  Araç Başarı Oranı: %" + str(oran) + " (" + str(basarili) + "/" + str(toplam) + ")")
     else:
         lines.append("  Araç Başarı Oranı: [VERI YOK]")
 
@@ -67,11 +67,10 @@ def get_panel() -> str:
     lines.append("  Aktif Modüller    : " + (", ".join(mods) if mods else "[HICBIRI]"))
 
     # Son Hatalar
-    errors = safe_call(_read_last_lines, f"{STORAGE}/kizil.log", 3,
+    errors = safe_call(_read_last_lines, STORAGE + "/kizil.log", 3,
                        fallback="[HATA LOGU YOK]", context="error_log")
-    lines.append("  Son Hata Satırları:
-" + (errors.strip() if errors else "[YOK]"))
+    error_text = errors.strip() if errors else "[YOK]"
+    lines.append("  Son Hata Satirlari:\n" + error_text)
 
     lines.append("=" * 60)
-    return "
-".join(lines)
+    return "\n".join(lines)

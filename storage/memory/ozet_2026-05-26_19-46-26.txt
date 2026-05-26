@@ -1,0 +1,18 @@
+Özet Tarihi: 2026-05-26 19:46:26
+Kaynak: storage/conversations/gunluk.txt
+------------------------------
+Projenizin deterministik kalmasını sağlamak için aşağıdaki adımları takip edebilirsiniz:
+
+1.  **Görev Ekleme**: Proje planı hazırlama görevini ekleyin ve açıklamasını belirleyin.
+2.  **İç Plan**: Projenin temelini oluşturacak bir plan hazırlamak için gerekli adımları belirleyin:
+    *   **Proje Tanımı**: Projenin amacını, hedeflerini ve kapsamını belirleyin.
+    *   **Zaman Planı**: Projenin tamamlanması için gereken zamanı belirleyin.
+    *   **Bütçe Planı**: Projenin maliyetini belirleyin ve kaynakları planlayın.
+    *   **Ekip Planı**: Proje ekibini oluşturun ve rolleri belirleyin.
+3.  **Adım 1: Proje Tanımı**:
+    *   **TOOL_CALL:** gorev_listele()
+4.  **Adım 2: Zaman Planı**:
+    *   **TOOL_CALL:** zaman()
+5.  **Not**: Proje planının temelini oluşturmak için bu adımları tamamlamanız gerekiyor. İlerleyen adımlarda daha fazla ayrıntı ekleyebilirsiniz.
+
+Bu adımlar, projenizin deterministik kalmasını sağlamak için gerekli adımlardır.

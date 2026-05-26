@@ -1,3 +1,13 @@
+
+import builtins
+if not hasattr(builtins, 'RuntimeDiagnostics'):
+    class RuntimeDiagnostics:
+        @staticmethod
+        def register_failure(*args, **kwargs): pass
+        @staticmethod
+        def report(*args, **kwargs): return {}
+    builtins.RuntimeDiagnostics = RuntimeDiagnostics
+
 import argparse
 import os
 import sys

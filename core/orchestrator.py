@@ -152,7 +152,6 @@ class Orchestrator:
 
     def start(self) -> None:
         self.running = True
-                # Data integrity: kritik dosyaları kontrol et, bozuksa safe-mode
         from utils.data_integrity import check_critical_files
         if not check_critical_files():
             from core.safe_mode import enable_safe_mode
@@ -176,13 +175,17 @@ class Orchestrator:
                 if not girdi:
                     continue
                 self._process(girdi)
-                diag = RuntimeDiagnostics()
-                if hasattr(diag, '_initialized') and diag._initialized:
-                    diag.turn_count += 1
-                    if diag.turn_count % diag.snapshot_interval == 0:
-                        diag.save()
+                try:
+                    diag = RuntimeDiagnostics()
+                    if hasattr(diag, '_initialized') and diag._initialized:
+                        diag.turn_count += 1
+                        if diag.turn_count % diag.snapshot_interval == 0:
+                            diag.save()
+                except Exception:
+                    pass
         finally:
             self.stop()
+
 
     def _process(self, girdi: str) -> None:
         # Request ID üret ve Logger'a ilet
@@ -383,6 +386,8 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             return None
         except Exception as e:
             self.logger.error(f"LLM hatası: {e}")
+            from core.auto_fixture import suggest
+            suggest(self._son_girdi or "", str(e))
             print("KIZIL: LLM çağrısı sırasında hata oluştu.")
             print(f"  -> Hata: {e}")
             return None
@@ -392,6 +397,8 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             ctx = self.memory.get_short_term()
             resp = self.chat.yanit_ver(msg, ctx)
             print("KIZIL:", resp)
+            from core.behavioral_drift import record_response
+            record_response(resp)
             return resp
 
         resp = self._safe_llm(istek)
@@ -684,15 +691,70 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print(panel)
         except Exception as e:
             print(f"Panel oluşturulamadı: {e}")
+
+    def _config_freeze(self) -> None:
+        try:
+            self.config.freeze()
+            print("KIZIL: Ayar yapılandırması donduruldu.")
+            print("  'ayar coz' ile dondurmayı kaldırabilirsiniz.")
+        except PermissionError as e:
+            print(f"KIZIL: {e}")
+        except Exception as e:
+            print(f"KIZIL: Dondurma başarısız: {e}")
+
+    def _config_unfreeze(self) -> None:
+        try:
+            self.config.unfreeze()
+            print("KIZIL: Ayar dondurma kaldırıldı.")
+        except Exception as e:
+            print(f"KIZIL: Çözme başarısız: {e}")
+
+    def _config_rollback(self) -> None:
+        backups = self.config.list_backups()
+        if not backups:
+            print("KIZIL: Geri dönülecek yedek bulunamadı.")
+            return
+        print(f"KIZIL: Son yedek: {backups[-1]}")
+        if self.config.rollback():
+            self.router.model = self.config.LLM_MODEL
+            self.chat.set_profile_prompt(self.profile.get_prompt())
+            print("KIZIL: Ayarlar son yedeğe geri döndürüldü.")
+        else:
+            print("KIZIL: Geri alma başarısız.")
+
+    def _config_list_backups(self) -> None:
+        backups = self.config.list_backups()
+        if not backups:
+            print("KIZIL: Henüz yedek bulunmuyor.")
+        else:
+            print("KIZIL: Config yedekleri:")
+            for i, b in enumerate(backups, 1):
+                print(f"  {i}. {b}")
+
+    def _config_check_drift(self) -> None:
+        if self.config.detect_drift():
+            print("⚠️  KIZIL: Config sapması tespit edildi!")
+            print("  'ayar geri al' ile son yedeğe dönebilirsiniz.")
+        else:
+            print("KIZIL: Config sapması yok.")
+
     def stop(self) -> None:
+        if self.running:
+            self._crash_detected = True
         if not self.running:
             return
         self.chat.save_metrics()
-        diag = RuntimeDiagnostics()
-        if hasattr(diag, '_initialized') and diag._initialized:
-            diag.save()
+        try:
+            diag = RuntimeDiagnostics()
+            if hasattr(diag, '_initialized') and diag._initialized:
+                diag.save()
+        except Exception:
+            pass
         self.watchdog.on_stop()
         self.session.end_session()
         self.running = False
+        from core.behavioral_drift import save_to_disk
+        save_to_disk()
         self.logger.info("KIZIL Asistan kapatılıyor.")
         print("Görüşmek üzere!")
+

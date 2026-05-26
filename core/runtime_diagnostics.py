@@ -16,7 +16,9 @@ class RuntimeDiagnostics:
         self._enabled = Config()._data.get("ENABLE_RUNTIME_DIAGNOSTICS", False)
 
         # Ilk kez kurulum (state yarat)
-        if not hasattr(self, '_storage_ready'):
+        if not hasattr(self, '_initialized'):
+            self._initialized = True
+            self._storage_ready = True
             self._storage_ready = True
             self.storage_dir = Path("storage/diagnostics")
             self.storage_dir.mkdir(parents=True, exist_ok=True)

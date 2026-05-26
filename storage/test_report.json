@@ -1,0 +1,256 @@
+{
+  "timestamp": "2026-05-26T19:41:00.936001",
+  "total": 62,
+  "passed": 62,
+  "failed": 0,
+  "results": [
+    {
+      "test": "main modülü",
+      "status": "PASS"
+    },
+    {
+      "test": "orchestrator",
+      "status": "PASS"
+    },
+    {
+      "test": "llm_router",
+      "status": "PASS"
+    },
+    {
+      "test": "memory_manager",
+      "status": "PASS"
+    },
+    {
+      "test": "chat_module",
+      "status": "PASS"
+    },
+    {
+      "test": "tool_manager",
+      "status": "PASS"
+    },
+    {
+      "test": "task_manager",
+      "status": "PASS"
+    },
+    {
+      "test": "session_manager",
+      "status": "PASS"
+    },
+    {
+      "test": "profile_manager",
+      "status": "PASS"
+    },
+    {
+      "test": "plugin_loader",
+      "status": "PASS"
+    },
+    {
+      "test": "config",
+      "status": "PASS"
+    },
+    {
+      "test": "logger",
+      "status": "PASS"
+    },
+    {
+      "test": "file_utils",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_mode",
+      "status": "PASS"
+    },
+    {
+      "test": "stability_watchdog",
+      "status": "PASS"
+    },
+    {
+      "test": "data_integrity",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_failures",
+      "status": "PASS"
+    },
+    {
+      "test": "telemetry_dashboard",
+      "status": "PASS"
+    },
+    {
+      "test": "session_fuzzer",
+      "status": "PASS"
+    },
+    {
+      "test": "runtime_diagnostics",
+      "status": "PASS"
+    },
+    {
+      "test": "Config singleton",
+      "status": "PASS"
+    },
+    {
+      "test": "Config varsayılanları",
+      "status": "PASS"
+    },
+    {
+      "test": "Config get/set",
+      "status": "PASS"
+    },
+    {
+      "test": "Config freeze",
+      "status": "PASS"
+    },
+    {
+      "test": "Config freeze engeli",
+      "status": "PASS"
+    },
+    {
+      "test": "Config unfreeze",
+      "status": "PASS"
+    },
+    {
+      "test": "Config detect_drift",
+      "status": "PASS"
+    },
+    {
+      "test": "Config rollback",
+      "status": "PASS"
+    },
+    {
+      "test": "Config list_backups",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger oluşturma",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger set_request_id",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger debug",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger info",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger warning",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger error",
+      "status": "PASS"
+    },
+    {
+      "test": "Logger clear_request_id",
+      "status": "PASS"
+    },
+    {
+      "test": "check_integrity (normal)",
+      "status": "PASS"
+    },
+    {
+      "test": "is_safe_mode (normal)",
+      "status": "PASS"
+    },
+    {
+      "test": "enable_safe_mode",
+      "status": "PASS"
+    },
+    {
+      "test": "is_safe_mode (aktif)",
+      "status": "PASS"
+    },
+    {
+      "test": "disable_safe_mode",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog oluşturma",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog on_start",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog heartbeat",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog on_stop",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog get_report",
+      "status": "PASS"
+    },
+    {
+      "test": "Watchdog crash sayısı",
+      "status": "PASS"
+    },
+    {
+      "test": "validate_json (geçerli)",
+      "status": "PASS"
+    },
+    {
+      "test": "validate_json (geçersiz)",
+      "status": "PASS"
+    },
+    {
+      "test": "check_critical_files",
+      "status": "PASS"
+    },
+    {
+      "test": "inject_schema_version",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_call (başarılı)",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_call (hata + yedek)",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_call (hata + callable yedek)",
+      "status": "PASS"
+    },
+    {
+      "test": "atomic_write_json",
+      "status": "PASS"
+    },
+    {
+      "test": "atomic_read_json",
+      "status": "PASS"
+    },
+    {
+      "test": "safe_read_text (yok)",
+      "status": "PASS"
+    },
+    {
+      "test": "get_panel",
+      "status": "PASS"
+    },
+    {
+      "test": "panel içeriği",
+      "status": "PASS"
+    },
+    {
+      "test": "_load_inputs",
+      "status": "PASS"
+    },
+    {
+      "test": "_hash_id",
+      "status": "PASS"
+    },
+    {
+      "test": "_vary",
+      "status": "PASS"
+    }
+  ]
+}

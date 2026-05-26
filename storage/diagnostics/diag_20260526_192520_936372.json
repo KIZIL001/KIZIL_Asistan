@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-05-26T19:25:20.936341",
+  "uptime_seconds": 91.1,
+  "turn_count": 1,
+  "memory_current_kb": 6.8,
+  "memory_peak_kb": 15.6,
+  "llm_calls": 0,
+  "llm_retries": 0,
+  "llm_errors": 0,
+  "tool_failures": 0,
+  "context_prunes": 0,
+  "poisoning_detections": 0
+}

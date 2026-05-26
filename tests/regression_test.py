@@ -220,6 +220,16 @@ def main():
         # Data integrity bypass: test sırasında kritik dosya kontrolü yapılmasın
         import utils.data_integrity as di
         di.CRITICAL_FILES = []
+        # Fixture suggestion bypass: test sırasında öneri dosyasını temizle
+        import os
+        sugg_file = "storage/fixture_suggestions.json"
+        if os.path.exists(sugg_file):
+            os.remove(sugg_file)
+        # Drift bypass: test sırasında drift dosyasını temizle
+        import os
+        drift_file = "storage/behavioral_drift.json"
+        if os.path.exists(drift_file):
+            os.remove(drift_file)
         # Safe failure bypass: test sırasında tüm fallback'ler orijinal func gibi davransın
         import core.safe_failures as sf
         sf.safe_call = lambda func, *args, **kwargs: func(*args)

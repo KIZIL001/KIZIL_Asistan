@@ -1,12 +1,20 @@
 {
-  "toplam_arac_cagrisi": 0,
-  "basarili_arac_cagrisi": 0,
-  "basarisiz_arac_cagrisi": 0,
-  "kirilan_zincir": 0,
-  "toplam_llm_cagrisi": 1,
-  "session_suresi_sn": 0,
+  "toplam_arac_cagrisi": 6,
+  "basarili_arac_cagrisi": 1,
+  "basarisiz_arac_cagrisi": 5,
+  "kirilan_zincir": 2,
+  "toplam_llm_cagrisi": 27,
+  "session_suresi_sn": 16,
   "determinizm_skoru": 0.0,
   "determinizm_orneklem": 0,
-  "_tool_fail_counts": {},
-  "_tool_last_fail_time": {}
+  "_tool_fail_counts": {
+    "dosya_oku": 2,
+    "klasor_olustur": 2,
+    "gorev_listele": 1
+  },
+  "_tool_last_fail_time": {
+    "dosya_oku": "2026-05-26T17:27:56.646003+00:00",
+    "klasor_olustur": "2026-05-26T17:45:06.124491+00:00",
+    "gorev_listele": "2026-05-26T17:45:19.881104+00:00"
+  }
 }

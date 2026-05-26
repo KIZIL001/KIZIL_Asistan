@@ -5,7 +5,7 @@
   "MEMORY_DIR": "memory",
   "LOG_FILE": "kizil.log",
   "LOG_LEVEL": "DEBUG",
-  "LLM_MODEL": "llama3.2:3b",
+  "LLM_MODEL": "llama3.1:8b",
   "SUMMARY_MAX_LINES": 50,
   "DEFAULT_UNKNOWN_RESPONSE": "Henüz tam olarak anlayamadım. Biraz daha basit sormayı dene ya da 'yardım' yaz.",
   "test_key": "value_4_9",
@@ -21,5 +21,8 @@
   "ENABLE_DETERMINISM_GUARD": true,
   "ENABLE_TOOL_RELIABILITY": true,
   "ENABLE_PROMPT_DISCIPLINE": true,
-  "schema_version": "1.0"
+  "schema_version": "1.0",
+  "_last_hash": "4757f0d8307352ed",
+  "TEST_KEY": "test",
+  "_frozen": false
 }

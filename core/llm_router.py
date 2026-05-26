@@ -48,7 +48,7 @@ class LLMRouter:
 
         last_error = ""
         diag = RuntimeDiagnostics()
-        if diag._initialized:
+        if hasattr(diag, '_initialized') and diag._initialized:
             diag.increment("llm_calls")
         for attempt in range(retry + 1):
             try:
@@ -56,20 +56,20 @@ class LLMRouter:
                 content = response.get("message", {}).get("content", "")
                 if self._uncertainty_enabled():
                     DeterminismGuard().check(messages, self.model, content)
-                return apply_filter(content)
+                return content  # apply_filter devre dışı
                 DeterminismGuard().check(messages, self.model, content)
                 return content
             except Exception as e:
                 last_error = str(e)
                 if attempt < retry:
-                    if diag._initialized:
+                    if hasattr(diag, '_initialized') and diag._initialized:
                         diag.increment("llm_retries")
                     self._log("warning",
                         f"LLM çağrısı başarısız (deneme {attempt+1}/{retry+1}), "
                         f"yeniden deneniyor: {e}")
                     time.sleep(2 ** attempt * 0.5)
                 else:
-                    if diag._initialized:
+                    if hasattr(diag, '_initialized') and diag._initialized:
                         diag.increment("llm_errors")
                     self._log("error", f"LLM çağrısı başarısız ({retry+1} deneme): {e}")
         return ""

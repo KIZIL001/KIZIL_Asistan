@@ -33,7 +33,8 @@ TOOL_RULES = """KURAL:
 8. Eğer bir araç hata verirse, hatanın sebebini (parametre eksikliği mi, yetki hatası mı, yanlış format mı?) kısaca belirt ve kullanıcıya bildir.
 9. Karmaşık görevlerde sistem sana bir [İÇ PLAN] verebilir, bu plana uyarak araçları sırayla çağır.
 10. Kullanıcının uzun vadeli veya geleceğe yönelik planlarını, sistemde tanımlı ilgili görev ve zincirleme araçlarını otonom kullanarak kalıcı hale getir.
-11. [KRİTİK] Kullanıcının sorusu açıkça yerel bir dosya işlemi, dizin listeleme veya sistem komutu gerektirmiyorsa ASLA araç ([TOOL_CALL]) tetikleme. Sohbet, selamlama, genel bilgi veya analiz sorularına doğrudan metin olarak cevap ver. Gereksiz araç çağrısı sistem hatası sayılır.
+11. [KRİTİK] Kullanıcının sorusu açıkça yerel bir dosya işlemi, dizin listeleme veya sistem komutu gerektirmiyorsa ASLA araç ([TOOL_CALL]) tetikleme.
+12. [KESİNLİKLE] Cevaplarında 'Sen:' veya 'Kullanıcı:' gibi konuşma prefix'leri kullanma. Doğrudan cevabı yaz. Sohbet, selamlama, genel bilgi veya analiz sorularına doğrudan metin olarak cevap ver. Gereksiz araç çağrısı sistem hatası sayılır.
 11. Çok adımlı karmaşık hedefleri görevlere böl, zincirle, [İÇ PLAN] ile adım adım uygula, tamamlanınca kullanıcıya BAŞKA BİR ARAÇ ÇAĞIRMADAN kısa bir özet rapor sun.
 12. Önemli bulgularını veya sonraki adım için gereken bilgiyi [NOT: buraya] formatında not alabilirsin. Bu notlar geçicidir, sohbet geçmişine eklenmez."""
 
@@ -226,6 +227,11 @@ class ChatModule:
 
     def _should_ask_user(self, msg: str) -> bool:
         msg_lower = msg.lower()
+        # Selamlaşma ve kısa sohbet ifadeleri belirsiz sayılmaz
+        greetings = ["merhaba", "selam", "hey", "hello", "hi", "iyi", "kötü", 
+                     "nasılsın", "ne haber", "naber", "günaydın", "iyi akşamlar"]
+        if any(g in msg_lower for g in greetings):
+            return False
         vague_patterns = ["ne yapabilirsin", "neler biliyorsun", "yardım et", "nasıl"]
         for pattern in vague_patterns:
             if pattern in msg_lower:
@@ -309,7 +315,10 @@ class ChatModule:
         
         if alerts:
             self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {'; '.join(alerts)}")
-            RuntimeDiagnostics().increment("poisoning_detections")
+            try:
+                RuntimeDiagnostics().increment("poisoning_detections")
+            except Exception:
+                pass
             # Bağlamı kırp (history'i temizle)
             history = []
             msg = "\n".join(alerts) + "\n" + msg
@@ -393,7 +402,10 @@ class ChatModule:
         try:
             from utils.config import Config
             if not Config()._data.get("ENABLE_JACCARD_PRUNING", False):
-                RuntimeDiagnostics().increment("context_prunes")
+                try:
+                    RuntimeDiagnostics().increment("context_prunes")
+                except Exception:
+                    pass
                 return self._prune_messages(messages)
         except Exception:
             return self._prune_messages(messages)
@@ -493,7 +505,10 @@ class ChatModule:
         msg, _ = self._check_context_poisoning(msg, [])
         if "[GÜVENLİK:" in msg:
             self._log("warning", f"Bağlam zehirlenmesi tespit edildi: {msg}")
+        try:
             RuntimeDiagnostics().increment("poisoning_detections")
+        except Exception:
+            pass
             return msg
 
         action = self._decide_action(msg)
@@ -717,7 +732,10 @@ class ChatModule:
         self._tool_fail_counts[tool_name] = count
         ToolReliability().increment_failure(tool_name)
         ToolReliability().increment_failure(tool_name)
-        RuntimeDiagnostics().increment("tool_failures")
+        try:
+            RuntimeDiagnostics().increment("tool_failures")
+        except Exception:
+            pass
         self._tool_last_fail_time[tool_name] = datetime.now(timezone.utc).isoformat()
         if count >= TOOL_BLACKLIST_THRESHOLD and tool_name not in self._blacklisted_tools:
             self._blacklisted_tools.add(tool_name)

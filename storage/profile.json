@@ -1,9 +1,9 @@
 {
-  "ad": "",
+  "ad": "ESAT",
   "tercihler": {
     "renk": "kırmızı"
   },
-  "notlar": "",
+  "notlar": "Projenizin deterministik kalmasını sağlamak için aşağıdaki adımları takip edebilirsiniz:\n\n1.  **Görev Ekleme**: Proje planı hazırlama görevini ekleyin ve açıklamasını belirleyin.\n2.  **İç Plan**: Projenin temelini oluşturacak bir plan hazırlamak için gerekli adımları belirleyin:\n    *   **Proje Tanımı**: Projenin amacını, hedeflerini ve kapsamını belirleyin.\n    *   **Zaman Planı**: Projenin tamamlanması için gereken zamanı belirleyin.\n    *   **Bütçe Planı**: Projenin maliyetini belirleyin ve kaynakları planlayın.\n    *   **Ekip Planı**: Proje ekibini oluşturun ve rolleri belirleyin.\n3.  **Adım 1: Proje Tanımı**:\n    *   **TOOL_CALL:** gorev_listele()\n4.  **Adım 2: Zaman Planı**:\n    *   **TOOL_CALL:** zaman()\n5.  **Not**: Proje planının temelini oluşturmak için bu adımları tamamlamanız gerekiyor. İlerleyen adımlarda daha fazla ayrıntı ekleyebilirsiniz.\n\nBu adımlar, projenizin deterministik kalmasını sağlamak için gerekli adımlardır.",
   "model": "llama3.2:3b",
   "schema_version": "1.0"
 }
