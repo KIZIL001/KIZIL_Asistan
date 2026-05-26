@@ -49,6 +49,7 @@ def check_critical_files() -> bool:
                 defaults = {"version": "1.1.0", "schema_version": "1.0"}
             try:
                 atomic_write_json(f, defaults)
+                print(f"⚠️  [UYARI] {f} bozuktu, fabrika varsayılanı ile yeniden oluşturuldu. Eski dosya {f}.bak olarak saklandı.")
             except Exception:
                 pass
             return False

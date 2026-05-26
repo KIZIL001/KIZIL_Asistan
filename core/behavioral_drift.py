@@ -25,6 +25,8 @@ def record_response(text: str) -> float:
     _data["avg"] = new_avg
     _data["count"] = n + 1
     _data["last_drift"] = round(drift, 3)
+    if len(_data["lengths"]) > 100:
+        _data["lengths"] = _data["lengths"][-100:]
     return drift
 
 def save_to_disk():
