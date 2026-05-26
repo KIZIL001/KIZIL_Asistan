@@ -17,6 +17,7 @@ from utils.logger import Logger
 from utils.config import Config
 from core.runtime_diagnostics import RuntimeDiagnostics
 from core.stability_watchdog import StabilityWatchdog
+from core.safe_failures import safe_call
 
 AUTO_SUMMARIZE_THRESHOLD = 20
 
@@ -392,7 +393,11 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("KIZIL:", resp)
             return resp
 
-        resp = self._safe_llm(istek)
+                def _fallback_chat():
+            print("KIZIL: Üzgünüm, şu anda yanıt üretemiyorum. Lütfen tekrar deneyin.")
+            return None
+
+        resp = safe_call(self._safe_llm, istek, fallback=_fallback_chat, context="chat", _logger=self.logger)
         if resp is not None:
             self.memory.save_conversation(msg, resp)
             self.memory.add_short_term("user", msg)
@@ -428,7 +433,11 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
                 print("KIZIL:", s)
             return s
 
-        self._safe_llm(istek)
+        def _fallback_summary():
+            print("KIZIL: Özet alınamadı.")
+            return None
+
+        safe_call(self._safe_llm, istek, fallback=_fallback_summary, context="summary", _logger=self.logger)
 
     def _remember(self, girdi: str) -> None:
         q = girdi.split(maxsplit=1)[1].strip() if " " in girdi else ""
@@ -441,7 +450,11 @@ karaliste temizle             → kara listeyi ve panik modunu sıfırla
             print("KIZIL:", a)
             return a
 
-        resp = self._safe_llm(istek)
+                def _fallback_chat():
+            print("KIZIL: Üzgünüm, şu anda yanıt üretemiyorum. Lütfen tekrar deneyin.")
+            return None
+
+        resp = safe_call(self._safe_llm, istek, fallback=_fallback_chat, context="chat", _logger=self.logger)
         if resp is not None:
             self.memory.save_conversation(girdi, resp)
             self.memory.add_short_term("user", girdi)

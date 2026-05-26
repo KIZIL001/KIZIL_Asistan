@@ -201,6 +201,9 @@ def main():
         # Data integrity bypass: test sırasında kritik dosya kontrolü yapılmasın
         import utils.data_integrity as di
         di.CRITICAL_FILES = []
+        # Safe failure bypass: test sırasında tüm fallback'ler orijinal func gibi davransın
+        import core.safe_failures as sf
+        sf.safe_call = lambda func, *args, **kwargs: func(*args)
         # Config bypass
         import shutil
         backup_dir = "storage/config_backups"
