@@ -76,6 +76,7 @@ class Orchestrator:
             "ayar yedekler": lambda: self._config_list_backups(),
             "ayar sapma": lambda: self._config_check_drift(),
             "durum": self._show_status,
+            "panel": self._show_dashboard,
             "karaliste": self._show_blacklist,
             "geri al": self._undo,
         }
