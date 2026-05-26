@@ -1,0 +1,8 @@
+{
+  "total_sessions": 0,
+  "total_crashes": 0,
+  "total_uptime_seconds": 0,
+  "last_heartbeat": null,
+  "clean_exit": false,
+  "session_history": []
+}

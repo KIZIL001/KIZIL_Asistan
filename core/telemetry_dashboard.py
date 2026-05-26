@@ -77,4 +77,15 @@ def get_panel() -> str:
     lines.append("  Son Hata Satirlari:\n" + error_text)
 
     lines.append("=" * 60)
+    # ASCII Drift Trend Grafiği (son 20 değer)
+    drift_file = STORAGE + "/behavioral_drift.json"
+    drift_data = safe_call(_read_json, drift_file, fallback={}, context="drift_graph")
+    lengths = drift_data.get("lengths", [])
+    if lengths:
+        recent = lengths[-20:]
+        max_len = max(recent) if recent else 1
+        lines.append("\n  Drift Trend (son 20 yanit):")
+        for val in recent:
+            bar_len = max(1, int(val / max_len * 30))
+            lines.append("  " + str(val).rjust(5) + " |" + "█" * bar_len)
     return "\n".join(lines)
