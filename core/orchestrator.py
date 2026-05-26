@@ -92,6 +92,9 @@ class Orchestrator:
 
         self._mesaj_sayaci = 0
         self._action_history: deque[dict] = deque(maxlen=100)
+        self._son_girdi: str | None = None
+        self._crash_detected: bool = False
+
         self.running = False
 
     # ========================================================================
@@ -161,6 +164,14 @@ class Orchestrator:
             self.stop()
 
     def _process(self, girdi: str) -> None:
+        # Poison pill koruması: önceki çökmeden kurtarıldıysa aynı girdiyi atla
+        if self._crash_detected and girdi == self._son_girdi:
+            self.logger.warning(f"Poison pill tespit edildi, girdi atlanıyor: {girdi[:80]}...")
+            print("KIZIL: Önceki çökmeye neden olan girdi otomatik olarak atlandı.")
+            self._crash_detected = False
+            return
+        self._son_girdi = girdi
+
         self.logger.info(f"Kullanıcı girdisi: {girdi}")
         try:
             komut = girdi.lower().strip()

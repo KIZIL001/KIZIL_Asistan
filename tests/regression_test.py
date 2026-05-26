@@ -186,6 +186,15 @@ def test_prompt_firewall(tests):
     return results
 
 def main():
+    # Test izolatörü: KIZIL_TEST_MODE=1 ise safe-mode bypass ve temiz çevre
+    import os
+    if os.environ.get("KIZIL_TEST_MODE") == "1":
+        # Temiz test ortamı: safe_mode_flag dosyasını yok say
+        safe_flag = "storage/.safe_mode"
+        if os.path.exists(safe_flag):
+            os.remove(safe_flag)
+        print("[TEST MODU] Safe-mode bypass edildi, test ortamı sıfırlandı.")
+
     fixtures = load_fixtures()
     all_results = {}
     total_pass = 0
