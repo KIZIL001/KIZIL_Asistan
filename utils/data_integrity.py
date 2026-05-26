@@ -26,9 +26,31 @@ def validate_json(path: str) -> dict | None:
         return None
 
 def check_critical_files() -> bool:
-    """Kritik dosyalar sağlamsa True, en az biri bozuksa False."""
+    """Kritik dosyalar sağlamsa True, en az biri bozuksa veya schema_version yoksa False."""
     for f in CRITICAL_FILES:
-        if validate_json(f) is None:
+        data = validate_json(f)
+        if data is None:
+            return False
+        if isinstance(data, dict) and "schema_version" not in data:
+            # Auto-healing: yedekle, varsayılanla yeniden oluştur
+            import shutil
+            bak = f + ".bak"
+            try:
+                shutil.copy2(f, bak)
+            except OSError:
+                pass
+            from utils.file_utils import atomic_write_json
+            defaults = {"schema_version": "1.0"}
+            if "config" in f:
+                from utils.config import Config
+                defaults = Config()._defaults()
+                defaults["schema_version"] = "1.0"
+            elif "release" in f:
+                defaults = {"version": "1.1.0", "schema_version": "1.0"}
+            try:
+                atomic_write_json(f, defaults)
+            except Exception:
+                pass
             return False
     return True
 
