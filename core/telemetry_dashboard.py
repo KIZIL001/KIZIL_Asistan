@@ -58,6 +58,10 @@ def get_panel() -> str:
     drift_var = safe_call(cfg.detect_drift, fallback="[KONTROL EDİLEMEDİ]", context="config_drift")
     drift_str = "VAR" if drift_var else "YOK" if drift_var is False else str(drift_var)
     lines.append("  Config Drift      : " + drift_str)
+    # Behavioral drift
+    drift_data = safe_call(_read_json, STORAGE + "/behavioral_drift.json", fallback={}, context="drift")
+    last_drift = drift_data.get("last_drift", "[VERI YOK]")
+    lines.append("  Yanit Stili Drift : " + str(last_drift))
 
     # Aktif Refinement Modülleri
     mods = []

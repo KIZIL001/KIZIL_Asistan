@@ -30,6 +30,15 @@ def _load_inputs():
             inp = t.get("input", "")
             if isinstance(inp, str) and inp.strip():
                 inputs.append(inp)
+    # Faz 10: fixture_suggestions.json'dan da girdi al
+    try:
+        with open("storage/fixture_suggestions.json", "r", encoding="utf-8") as sf:
+            suggestions = json.load(sf)
+        for s in suggestions:
+            if isinstance(s.get("input"), str) and s["input"].strip():
+                inputs.append(s["input"])
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
     return inputs
 
 
