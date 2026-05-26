@@ -137,3 +137,45 @@ küçük ama keskin,
 minimal ama güçlü,
 basit ama sağlam
 kalmalıdır.
+
+## PRODUCTION STABILITY DOCTRINE
+
+KIZIL artık capability expansion aşamasını tamamlamıştır.
+
+Bundan sonraki geliştirmeler:
+- yeni özellik eklemekten çok,
+- mevcut davranışı korumaya,
+- ölçmeye,
+- doğrulamaya,
+- deterministikliği sürdürmeye,
+- güvenli bozulma modları oluşturmaya
+
+odaklanmalıdır.
+
+Yeni capability önerileri varsayılan olarak REDDEDİLİR.
+
+Yeni kod:
+- mevcut davranışı açıklanabilir kılmalı,
+- regresyon riskini azaltmalı,
+- rollback güvenliği sağlamalı,
+- telemetry ile doğrulanmalı,
+- minimal patch olmalıdır.
+
+## RELEASE DISCIPLINE RULE
+
+Stable release sonrası:
+- mevcut mimari yeniden tasarlanamaz,
+- runtime modeli değiştirilemez,
+- abstraction katmanı eklenemez,
+- event-driven yapıya geçilemez,
+- async/thread/distributed mimariye geçilemez.
+
+Yeni geliştirmeler:
+- ölçüm,
+- doğrulama,
+- gözlem,
+- güvenilirlik,
+- recovery,
+- regression prevention
+
+alanlarıyla sınırlıdır.
