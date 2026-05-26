@@ -150,6 +150,16 @@ class Orchestrator:
 
     def start(self) -> None:
         self.running = True
+                # Data integrity: kritik dosyaları kontrol et, bozuksa safe-mode
+        from utils.data_integrity import check_critical_files
+        if not check_critical_files():
+            from core.safe_mode import enable_safe_mode
+            enable_safe_mode()
+            self.logger.critical("Kritik veri dosyaları bozuk. Safe-mode aktif edildi.")
+            print("⚠️  Kritik veri dosyalarında bozulma tespit edildi. Sistem safe‑mode'da başlatılıyor.")
+            print("   Lütfen 'python3 recovery.py' ile kurtarma yapın.")
+            self.running = False
+            return
         self.session.start_session()
         self.watchdog.on_start()
         self.logger.info("KIZIL Asistan başlatılıyor...")

@@ -4,5 +4,6 @@
     "renk": "kırmızı"
   },
   "notlar": "",
-  "model": "llama3.2:3b"
+  "model": "llama3.2:3b",
+  "schema_version": "1.0"
 }
